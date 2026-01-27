@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Beige Theme Palette */
+  --color-beige-100: #fbf8f3; /* Main Chat Background */
+  --color-beige-200: #f5efe6; /* Sidebar Background */
+  --color-beige-300: #e6dfd5; /* Borders / Input Background */
+  --color-brown-400: #d4c5b0; /* Accent / Logo Background */
+  --color-brown-600: #a69076; /* Active Item / Button Hover */
+  --color-brown-800: #5c4d3c; /* Text Color */
+  --color-accent-gold: #e2c08d; /* "AI Trainer" Header Background (approx) */
+  --color-button-brown: #cbbba4; /* Send Button */
+  
+  --foreground-rgb: 92, 77, 60;
+  --background-start-rgb: 251, 248, 243;
+  --background-end-rgb: 251, 248, 243;
+}
+
+body {
+  color: var(--color-brown-800);
+  background: var(--color-beige-100);
+  font-family: 'Inter', sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

@@ -101,13 +101,24 @@ async def health_check():
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 
-@app.post("/debug/register")
+from fastapi import Request
+from sqlalchemy.exc import IntegrityError
+from app.db.session import AsyncSessionLocal
+from app.models.user import User
+
+@app.post(f"{settings.API_V1_STR}/debug/register")
 async def debug_register(request: Request):
+    """
+    Временный эндпоинт для тестирования регистрации на iPad.
+    Возвращает JSON с результатом попытки создать пользователя.
+    """
     data = await request.json()
     email = data.get("email")
     password = data.get("password")
 
-    from app.models.user import User  # импорт модели пользователя
+    if not email or not password:
+        return {"status": "error", "message": "Email or password missing"}
+
     async with AsyncSessionLocal() as db:
         try:
             user = User(email=email, password=password)
@@ -116,7 +127,15 @@ async def debug_register(request: Request):
             return {"status": "ok", "message": "User created", "email": email}
         except IntegrityError as e:
             await db.rollback()
-            return {"status": "error", "message": "User already exists or other DB error", "details": str(e)}
+            return {
+                "status": "error",
+                "message": "User already exists or other DB error",
+                "details": str(e),
+            }
         except Exception as e:
             await db.rollback()
-            return {"status": "error", "message": "Other error", "details": str(e)}
+            return {
+                "status": "error",
+                "message": "Other error",
+                "details": str(e),
+            }

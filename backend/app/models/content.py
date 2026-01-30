@@ -40,6 +40,10 @@ class UserTestResult(Base):
     user = relationship("User", backref="test_results")
     test = relationship("Test")
 
+    @property
+    def answers(self):
+        return self.details or {}
+
 
 class CaseSolution(Base):
     __tablename__ = "case_solutions"

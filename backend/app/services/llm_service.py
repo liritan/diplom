@@ -443,6 +443,7 @@ class LLMService:
                 
                 # Parse and validate the response
                 parsed_data = self._parse_llm_response(response_text, "skill_scores")
+                parsed_data = self._calibrate_test_scores(parsed_data, questions, answers)
                 
                 # Create SkillScores object
                 skill_scores = SkillScores(
@@ -712,7 +713,15 @@ class LLMService:
 {qa_text}
 
 ЗАДАЧА:
-Оцени следующие навыки по шкале от 0 до 100 на основе ответов:
+Оцени следующие навыки по шкале от 0 до 100 на основе ответов.
+
+ВАЖНО: оценка должна быть строгой и доказательной.
+- 90–100 ставь только за выдающиеся ответы с ясной аргументацией и примерами.
+- 70–89 — выше среднего, когда ответы уверенные и содержательные.
+- 50–69 — средний уровень, если ответы поверхностные или неоднозначные.
+- 0–49 — ниже среднего при слабых/ошибочных ответах.
+- Если сомневаешься, занижай оценку, а не завышай.
+
 1. Коммуникация (communication)
 2. Эмоциональный интеллект (emotional_intelligence)
 3. Критическое мышление (critical_thinking)
@@ -880,6 +889,55 @@ class LLMService:
         
         logger.debug(f"Refined prompt with additional instructions based on error: {error_message}")
         return refined_prompt
+
+    def _calibrate_test_scores(
+        self,
+        data: Dict[str, Any],
+        questions: List[Dict[str, Any]],
+        answers: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Apply conservative calibration to test scores to avoid inflated results.
+        Compress high-end scores and mildly penalize incomplete answers.
+        """
+        calibrated = dict(data)
+        total_questions = len(questions) if questions else len(answers)
+        answered_count = 0
+
+        if questions:
+            for question in questions:
+                q_id = str(question.get("id"))
+                value = answers.get(q_id)
+                if value is None:
+                    continue
+                if isinstance(value, str) and value.strip().lower() in {"", "не отвечено", "no answer"}:
+                    continue
+                answered_count += 1
+        else:
+            for value in answers.values():
+                if value is None:
+                    continue
+                if isinstance(value, str) and value.strip().lower() in {"", "не отвечено", "no answer"}:
+                    continue
+                answered_count += 1
+
+        coverage = answered_count / total_questions if total_questions else 1.0
+        coverage_factor = 0.85 + 0.15 * coverage
+
+        for key in [
+            "communication",
+            "emotional_intelligence",
+            "critical_thinking",
+            "time_management",
+            "leadership",
+        ]:
+            raw = float(calibrated.get(key, 0))
+            if raw > 70:
+                raw = 70 + (raw - 70) * 0.5
+            raw *= coverage_factor
+            calibrated[key] = max(0.0, min(100.0, raw))
+
+        return calibrated
     
     def _validate_skill_scores(self, data: Dict[str, Any]) -> None:
         """

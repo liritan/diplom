@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     YANDEX_FOLDER_ID: str = ""
     YANDEX_API_KEY: str = ""
 
+    DEFAULT_ADMIN_EMAIL: str = "admin123@admin123.com"
+    DEFAULT_ADMIN_PASSWORD: str = "admin123"
+
     # Development plan generation
     MIN_ANALYSES_FOR_PLAN: int = 3
 
@@ -39,5 +42,10 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
                 f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
             )
+
+        if self.DEFAULT_ADMIN_EMAIL and "@" in self.DEFAULT_ADMIN_EMAIL:
+            local_part, domain = self.DEFAULT_ADMIN_EMAIL.split("@", 1)
+            if domain.lower().endswith(".local"):
+                self.DEFAULT_ADMIN_EMAIL = f"{local_part}@admin123.com"
 
 settings = Settings()

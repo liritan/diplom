@@ -13,6 +13,15 @@ class MaterialItem(BaseModel):
     difficulty: str  # 'beginner', 'intermediate', 'advanced'
 
 
+class MaterialUpdate(BaseModel):
+    """Schema for updating a learning material item"""
+    title: Optional[str] = None
+    url: Optional[str] = None
+    type: Optional[str] = None
+    skill: Optional[str] = None
+    difficulty: Optional[str] = None
+
+
 class TaskItem(BaseModel):
     """Schema for a development task item"""
     id: str
@@ -20,6 +29,14 @@ class TaskItem(BaseModel):
     skill: str
     status: str = "pending"  # 'pending', 'completed'
     completed_at: Optional[datetime] = None
+
+
+class TaskUpdate(BaseModel):
+    """Schema for updating a development task item"""
+    description: Optional[str] = None
+    skill: Optional[str] = None
+    status: Optional[str] = None
+    completed_at: Optional[str] = None
 
 
 class TestRecommendation(BaseModel):

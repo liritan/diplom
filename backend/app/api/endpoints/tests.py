@@ -1,7 +1,10 @@
+import json
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, File, UploadFile, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import delete
 from sqlalchemy.orm import selectinload
 
 from app.api import deps
@@ -55,8 +58,12 @@ async def create_test(
     )
     db.add(test)
     await db.commit()
-    await db.refresh(test)
-    return test
+    result = await db.execute(
+        select(Test)
+        .options(selectinload(Test.questions))
+        .where(Test.id == test.id)
+    )
+    return result.scalars().first()
 
 @router.post("/{test_id}/submit", response_model=dict)
 async def submit_test(
@@ -120,6 +127,18 @@ async def read_my_test_results(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+@router.delete("/me/results")
+async def delete_my_test_results(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    result = await db.execute(
+        delete(UserTestResult).where(UserTestResult.user_id == current_user.id)
+    )
+    await db.commit()
+    return {"status": "deleted", "deleted": int(result.rowcount or 0)}
 
 
 @router.get("/me/case-solutions", response_model=List[CaseSolutionSchema])
@@ -263,6 +282,70 @@ async def simulation_reply(
 
     reply = await yandex_service.get_chat_response(prompt)
     return {"reply": reply}
+
+
+@router.post("/simulations/{scenario}/voice", response_model=dict)
+async def simulation_voice_message(
+    *,
+    scenario: str,
+    file: UploadFile = File(...),
+    messages: str = Form("[]"),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    scenario_map = {
+        "interview": "Собеседование",
+        "conflict": "Конфликт в команде",
+        "negotiation": "Переговоры",
+    }
+    title = scenario_map.get(scenario)
+    if not title:
+        raise HTTPException(status_code=404, detail="Unknown simulation")
+
+    audio_content = await file.read()
+    user_text = await yandex_service.speech_to_text(audio_content)
+    if not user_text:
+        return {
+            "response": "Извините, я не смог распознать ваше сообщение.",
+            "user_text": "",
+            "status": "failed",
+        }
+
+    try:
+        history = json.loads(messages) if messages else []
+        if not isinstance(history, list):
+            history = []
+    except Exception:
+        history = []
+
+    transcript_lines = []
+    for m in history:
+        if not isinstance(m, dict):
+            continue
+        role = m.get("role")
+        text = m.get("text")
+        if not role or not text:
+            continue
+        speaker = "Пользователь" if role == "user" else "Собеседник"
+        transcript_lines.append(f"{speaker}: {text}")
+
+    transcript_lines.append(f"Пользователь: {user_text}")
+    transcript = "\n".join(transcript_lines)
+
+    prompt = (
+        f"Ты участвуешь в симуляции '{title}'. "
+        "Ты играешь роль собеседника (вторая сторона). "
+        "Пользователь пишет только свои реплики. "
+        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
+        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
+        f"Диалог:\n{transcript}\n\nСобеседник:"
+    )
+
+    reply = await yandex_service.get_chat_response(prompt)
+    return {
+        "response": reply,
+        "user_text": user_text,
+        "status": "ok",
+    }
 
 
 @router.get("/{test_id}", response_model=TestSchema)

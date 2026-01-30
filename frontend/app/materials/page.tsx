@@ -34,6 +34,32 @@ type Plan = {
   progress: { completed: number; total: number; percentage: number };
 };
 
+function skillLabel(value: string) {
+  const v = String(value || "").toLowerCase();
+  if (v === "communication") return "Коммуникация";
+  if (v === "emotional_intelligence") return "Эмоциональный интеллект";
+  if (v === "critical_thinking") return "Критическое мышление";
+  if (v === "time_management") return "Тайм-менеджмент";
+  if (v === "leadership") return "Лидерство";
+  return value;
+}
+
+function difficultyLabel(value: string) {
+  const v = String(value || "").toLowerCase();
+  if (v === "beginner") return "Начинающий";
+  if (v === "intermediate") return "Средний";
+  if (v === "advanced") return "Продвинутый";
+  return value;
+}
+
+function materialTypeLabel(value: string) {
+  const v = String(value || "").toLowerCase();
+  if (v === "article") return "Статья";
+  if (v === "video") return "Видео";
+  if (v === "course") return "Курс";
+  return value;
+}
+
 export default function MaterialsPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +111,7 @@ export default function MaterialsPage() {
 
   const tasks = useMemo(() => plan?.tasks ?? [], [plan]);
   const materials = useMemo(() => plan?.materials ?? [], [plan]);
+  const recommendedTests = useMemo(() => plan?.recommended_tests ?? [], [plan]);
 
   return (
     <AppLayout>
@@ -118,7 +145,7 @@ export default function MaterialsPage() {
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <div className="text-sm font-bold text-brown-800">{m.title}</div>
-                            <div className="text-xs text-brown-600 mt-1">{m.type} • {m.skill} • {m.difficulty}</div>
+                            <div className="text-xs text-brown-600 mt-1">{materialTypeLabel(m.type)} • {skillLabel(m.skill)} • {difficultyLabel(m.difficulty)}</div>
                           </div>
                           <div className="text-xs font-bold text-brown-800">Открыть</div>
                         </div>
@@ -158,7 +185,7 @@ export default function MaterialsPage() {
                     <div key={t.id} className="bg-beige-100 border border-beige-300 rounded-xl p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                       <div>
                         <div className="text-brown-800 font-bold">{t.description}</div>
-                        <div className="text-brown-600 text-xs mt-1">{t.skill}</div>
+                        <div className="text-brown-600 text-xs mt-1">{skillLabel(t.skill)}</div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className={`text-xs font-bold ${t.status === "completed" ? "text-green-700" : "text-brown-800"}`}>
@@ -177,6 +204,25 @@ export default function MaterialsPage() {
                   ))}
                   {!tasks.length ? (
                     <div className="text-brown-600 text-sm">Задания пока не сформированы</div>
+                  ) : null}
+                </div>
+              </Card>
+
+              <Card className="bg-white border border-beige-300 shadow-sm rounded-xl p-6">
+                <h3 className="text-lg font-bold text-brown-800">Рекомендованные тесты</h3>
+                <div className="mt-4 space-y-3">
+                  {recommendedTests.map((rt) => (
+                    <a
+                      key={rt.test_id}
+                      href={`/tests/${rt.test_id}`}
+                      className="block bg-beige-100 border border-beige-300 rounded-xl p-5 hover:bg-beige-200 transition-colors"
+                    >
+                      <div className="text-sm font-bold text-brown-800">{rt.title}</div>
+                      <div className="text-xs text-brown-600 mt-2">{rt.reason}</div>
+                    </a>
+                  ))}
+                  {!recommendedTests.length ? (
+                    <div className="text-brown-600 text-sm">Рекомендации пока не сформированы</div>
                   ) : null}
                 </div>
               </Card>

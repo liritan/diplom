@@ -120,7 +120,7 @@ async def complete_task(
         percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
         
         # Find the completed task to get its completed_at timestamp
-        completed_task = next((t for t in tasks if t.get("id") == task_id), None)
+        completed_task = next((t for t in tasks if str(t.get("id")) == str(task_id)), None)
         if not completed_task:
             raise HTTPException(status_code=404, detail="Задание не найдено")
         

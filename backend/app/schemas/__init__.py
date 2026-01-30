@@ -30,7 +30,9 @@ from .profile import (
 )
 from .plan import (
     MaterialItem,
+    MaterialUpdate,
     TaskItem,
+    TaskUpdate,
     TestRecommendation,
     DevelopmentPlanContent,
     DevelopmentPlanBase,
@@ -67,7 +69,9 @@ __all__ = [
     "ProfileWithHistory",
     # Plan schemas
     "MaterialItem",
+    "MaterialUpdate",
     "TaskItem",
+    "TaskUpdate",
     "TestRecommendation",
     "DevelopmentPlanContent",
     "DevelopmentPlanBase",

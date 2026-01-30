@@ -8,7 +8,7 @@ using FastAPI BackgroundTasks for serverless deployment compatibility.
 import asyncio
 import logging
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -62,13 +62,13 @@ async def process_analysis_background(
             # Use timeout for serverless compatibility (Requirement 6.1, 6.3)
             await asyncio.wait_for(
                 _process_analysis_with_db(task_id, user_id, response_type, response_data, db),
-                timeout=30.0
+                timeout=120.0
             )
             
         except asyncio.TimeoutError:
-            logger.error(f"Analysis task {task_id} timed out after 30 seconds")
+            logger.error(f"Analysis task {task_id} timed out after 120 seconds")
             # Update task status to failed
-            await _mark_task_failed(task_id, "Analysis timed out after 30 seconds", db)
+            await _mark_task_failed(task_id, "Analysis timed out after 120 seconds", db)
             
         except Exception as e:
             logger.error(f"Error processing analysis task {task_id}: {str(e)}", exc_info=True)
@@ -287,18 +287,24 @@ async def _process_analysis_with_db(
     
     # Step 5: Check if development plan generation is needed (Requirement 3.1)
     plan_service = PlanService()
-    new_plan = await plan_service.check_and_generate_plan(
-        user_id=user_id,
-        profile=profile,
-        db=db
-    )
-    
-    if new_plan:
-        logger.info(f"New development plan {new_plan.id} generated for user {user_id}")
+    try:
+        new_plan = await plan_service.check_and_generate_plan(
+            user_id=user_id,
+            profile=profile,
+            db=db
+        )
+
+        if new_plan:
+            logger.info(f"New development plan {new_plan.id} generated for user {user_id}")
+    except Exception as e:
+        logger.error(
+            f"Plan generation failed after analysis task {task_id} (user_id={user_id}): {str(e)}",
+            exc_info=True,
+        )
     
     # Update task status to completed
     task.status = "completed"
-    task.completed_at = datetime.utcnow()
+    task.completed_at = datetime.now(timezone.utc)
     await db.commit()
     
     logger.info(f"Analysis task {task_id} completed successfully")

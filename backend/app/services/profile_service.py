@@ -170,26 +170,35 @@ class ProfileService:
             
         Requirements: 2.4, 2.5
         """
-        # Create list of (skill_name, score) tuples
+        # Create list of (skill_key, label, score) tuples
         skills = [
-            ("Communication", profile.communication_score),
-            ("Emotional Intelligence", profile.emotional_intelligence_score),
-            ("Critical Thinking", profile.critical_thinking_score),
-            ("Time Management", profile.time_management_score),
-            ("Leadership", profile.leadership_score)
+            ("communication", "Коммуникация", profile.communication_score),
+            ("emotional_intelligence", "Эмоциональный интеллект", profile.emotional_intelligence_score),
+            ("critical_thinking", "Критическое мышление", profile.critical_thinking_score),
+            ("time_management", "Тайм-менеджмент", profile.time_management_score),
+            ("leadership", "Лидерство", profile.leadership_score)
         ]
-        
+
         # Sort by score
-        sorted_skills = sorted(skills, key=lambda x: x[1], reverse=True)
-        
-        # Top-3 are strengths, bottom-3 are weaknesses
-        strengths = [skill[0] for skill in sorted_skills[:3]]
-        weaknesses = [skill[0] for skill in sorted_skills[-3:]]
-        weaknesses.reverse()  # Show weakest first
-        
+        sorted_skills = sorted(skills, key=lambda x: x[2], reverse=True)
+
+        # Avoid overlap between strengths and weaknesses
+        strengths_slice = sorted_skills[: min(3, len(sorted_skills))]
+        strength_keys = {skill[0] for skill in strengths_slice}
+
+        weaknesses_labels = []
+        for key, label, _ in reversed(sorted_skills):
+            if key in strength_keys:
+                continue
+            weaknesses_labels.append(label)
+            if len(weaknesses_labels) >= 3:
+                break
+
+        strengths_labels = [skill[1] for skill in strengths_slice]
+
         return StrengthsWeaknesses(
-            strengths=strengths,
-            weaknesses=weaknesses
+            strengths=strengths_labels,
+            weaknesses=weaknesses_labels
         )
     
     def _calculate_weighted_average(

@@ -24,7 +24,7 @@ export default function LoginPage() {
       });
       login(response.data.access_token);
     } catch (err) {
-      setError("Invalid email or password");
+      setError("Неверный логин или пароль");
     }
   };
 
@@ -32,9 +32,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-beige-100">
       <Card className="w-full max-w-md space-y-8 bg-white border border-beige-300 rounded-xl p-8 shadow-sm">
         <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-brown-800">Sign in</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-brown-800">Вход</h2>
           <p className="mt-2 text-sm text-brown-600">
-            Or <Link href="/register" className="text-brown-600 hover:text-brown-800 underline">create a new account</Link>
+            Или <Link href="/register" className="text-brown-600 hover:text-brown-800 underline">создайте новый аккаунт</Link>
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -42,8 +42,8 @@ export default function LoginPage() {
             <div className="mb-4">
               <Input
                 {...register("email", { required: true })}
-                type="email"
-                placeholder="Email address"
+                type="text"
+                placeholder="Email или логин (например: admin123)"
                 className="relative block w-full appearance-none rounded-md border border-beige-300 px-3 py-2 text-brown-800 placeholder-brown-600/70 focus:z-10 focus:border-brown-600 focus:outline-none focus:ring-brown-600 sm:text-sm"
               />
             </div>
@@ -51,7 +51,7 @@ export default function LoginPage() {
               <Input
                 {...register("password", { required: true })}
                 type="password"
-                placeholder="Password"
+                placeholder="Пароль"
                 className="relative block w-full appearance-none rounded-md border border-beige-300 px-3 py-2 text-brown-800 placeholder-brown-600/70 focus:z-10 focus:border-brown-600 focus:outline-none focus:ring-brown-600 sm:text-sm"
               />
             </div>
@@ -61,7 +61,7 @@ export default function LoginPage() {
 
           <div>
             <Button type="submit" className="w-full">
-              Sign in
+              Войти
             </Button>
           </div>
         </form>

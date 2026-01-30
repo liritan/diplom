@@ -22,7 +22,7 @@ export default function RegisterPage() {
       });
       router.push("/login");
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed");
+      setError(err.response?.data?.detail || "Ошибка регистрации");
     }
   };
 
@@ -30,9 +30,9 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-beige-100">
       <Card className="w-full max-w-md space-y-8 bg-white border border-beige-300 rounded-xl p-8 shadow-sm">
         <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-brown-800">Create Account</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-brown-800">Создать аккаунт</h2>
           <p className="mt-2 text-sm text-brown-600">
-            Already have an account? <Link href="/login" className="text-brown-600 hover:text-brown-800 underline">Sign in</Link>
+            Уже есть аккаунт? <Link href="/login" className="text-brown-600 hover:text-brown-800 underline">Войти</Link>
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -41,7 +41,7 @@ export default function RegisterPage() {
               <Input
                 {...register("full_name", { required: true })}
                 type="text"
-                placeholder="Full Name"
+                placeholder="ФИО"
                 className="relative block w-full appearance-none rounded-md border border-beige-300 px-3 py-2 text-brown-800 placeholder-brown-600/70 focus:z-10 focus:border-brown-600 focus:outline-none focus:ring-brown-600 sm:text-sm"
               />
             </div>
@@ -49,7 +49,7 @@ export default function RegisterPage() {
               <Input
                 {...register("email", { required: true })}
                 type="email"
-                placeholder="Email address"
+                placeholder="Email"
                 className="relative block w-full appearance-none rounded-md border border-beige-300 px-3 py-2 text-brown-800 placeholder-brown-600/70 focus:z-10 focus:border-brown-600 focus:outline-none focus:ring-brown-600 sm:text-sm"
               />
             </div>
@@ -57,7 +57,7 @@ export default function RegisterPage() {
               <Input
                 {...register("password", { required: true })}
                 type="password"
-                placeholder="Password"
+                placeholder="Пароль"
                 className="relative block w-full appearance-none rounded-md border border-beige-300 px-3 py-2 text-brown-800 placeholder-brown-600/70 focus:z-10 focus:border-brown-600 focus:outline-none focus:ring-brown-600 sm:text-sm"
               />
             </div>
@@ -67,7 +67,7 @@ export default function RegisterPage() {
 
           <div>
             <Button type="submit" className="w-full">
-              Register
+              Зарегистрироваться
             </Button>
           </div>
         </form>

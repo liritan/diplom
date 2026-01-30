@@ -5,12 +5,15 @@ Handles plan generation, task completion tracking, and plan regeneration logic.
 
 import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc, func
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.profile import DevelopmentPlan, SoftSkillsProfile, ProfileHistory
 from app.models.analysis import AnalysisResult
+from app.models.content import Test
 from app.schemas.plan import DevelopmentPlanContent, MaterialItem, TaskItem, TestRecommendation
 from app.services.llm_service import LLMService
 from app.core.config import settings
@@ -75,7 +78,11 @@ class PlanService:
             should_generate = True
         else:
             # Check if more than 7 days have passed since last generation (Requirement 3.1)
-            days_since_generation = (datetime.utcnow() - active_plan.generated_at).days
+            generated_at = active_plan.generated_at
+            now_utc = datetime.now(timezone.utc)
+            if generated_at is not None and generated_at.tzinfo is None:
+                generated_at = generated_at.replace(tzinfo=timezone.utc)
+            days_since_generation = (now_utc - generated_at).days
             
             if days_since_generation > 7:
                 logger.info(f"Last plan for user {user_id} was generated {days_since_generation} days ago. Will generate new plan.")
@@ -134,16 +141,20 @@ class PlanService:
         if plan is None:
             raise ValueError(f"Active plan {plan_id} not found for user {user_id}")
         
-        # Update task status in content JSON
         content = plan.content
-        if not content or "tasks" not in content:
-            raise ValueError(f"Plan {plan_id} has invalid content structure")
+        if not isinstance(content, dict):
+            content = {}
+
+        tasks = content.get("tasks")
+        if not isinstance(tasks, list):
+            tasks = []
+            content["tasks"] = tasks
         
         task_found = False
-        for task in content["tasks"]:
-            if task.get("id") == task_id:
+        for task in tasks:
+            if str(task.get("id")) == str(task_id):
                 task["status"] = "completed"
-                task["completed_at"] = datetime.utcnow().isoformat()
+                task["completed_at"] = datetime.now(timezone.utc).isoformat()
                 task_found = True
                 logger.info(f"Marked task {task_id} as completed in plan {plan_id}")
                 break
@@ -151,9 +162,9 @@ class PlanService:
         if not task_found:
             raise ValueError(f"Task {task_id} not found in plan {plan_id}")
         
-        # Update the plan
-        plan.content = content
-        await db.flush()
+        plan.content = jsonable_encoder(content)
+        flag_modified(plan, "content")
+        await db.commit()
         await db.refresh(plan)
         
         return plan
@@ -379,6 +390,8 @@ class PlanService:
                     )
                 ],
             )
+
+        plan_content.recommended_tests = await self._select_recommended_tests(weaknesses, db)
         
         # Step 5: Validate material uniqueness (Requirement 4.5, Property 13)
         if previous_plans:
@@ -399,6 +412,51 @@ class PlanService:
         
         logger.info(f"Successfully generated new development plan {new_plan.id} for user {user_id}")
         return new_plan
+
+    async def _select_recommended_tests(self, weaknesses: List[str], db: AsyncSession) -> List[TestRecommendation]:
+        query = await db.execute(select(Test).where(Test.type != "simulation").order_by(Test.id.asc()))
+        tests = list(query.scalars().all())
+        if not tests:
+            return []
+
+        skill_keywords = {
+            "communication": ["коммуник", "communication"],
+            "emotional_intelligence": ["эмоцион", "emotional", "intelligence"],
+            "critical_thinking": ["крит", "critical", "мышлен"],
+            "time_management": ["тайм", "time", "management"],
+            "leadership": ["лидер", "leadership", "lead"],
+        }
+
+        def _resolve_keywords(weakness: str) -> List[str]:
+            if not weakness:
+                return []
+            normalized = weakness.lower().replace("-", " ").replace("_", " ")
+            for keywords in skill_keywords.values():
+                if any(keyword in normalized for keyword in keywords):
+                    return keywords
+            return []
+
+        picked: List[Test] = []
+        for w in weaknesses:
+            keywords = _resolve_keywords(w)
+            for t in tests:
+                hay = f"{t.title} {t.description}".lower()
+                if any(k in hay for k in keywords):
+                    if t not in picked:
+                        picked.append(t)
+                    break
+
+        for t in tests:
+            if len(picked) >= 3:
+                break
+            if t not in picked:
+                picked.append(t)
+
+        reason = "Рекомендуем пройти тесты, чтобы собрать больше данных и улучшить слабые навыки." if weaknesses else "Рекомендуем пройти тесты для накопления данных." 
+        return [
+            TestRecommendation(test_id=int(t.id), title=t.title, reason=reason)
+            for t in picked[:3]
+        ]
     
     async def _archive_active_plan(
         self,
@@ -447,11 +505,11 @@ class PlanService:
         Requirements: 2.5
         """
         skills = [
-            ("Time Management", profile.time_management_score),
-            ("Critical Thinking", profile.critical_thinking_score),
-            ("Communication", profile.communication_score),
-            ("Emotional Intelligence", profile.emotional_intelligence_score),
-            ("Leadership", profile.leadership_score)
+            ("Тайм-менеджмент", profile.time_management_score),
+            ("Критическое мышление", profile.critical_thinking_score),
+            ("Коммуникация", profile.communication_score),
+            ("Эмоциональный интеллект", profile.emotional_intelligence_score),
+            ("Лидерство", profile.leadership_score)
         ]
         
         # Sort by score (ascending) to get weaknesses

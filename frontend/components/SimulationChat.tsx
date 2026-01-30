@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import api from "@/lib/api";
 import { Button, Card } from "@/components/ui/common";
+import { VoiceRecorder } from "@/components/VoiceRecorder";
 
-type Message = {
-  id: number;
-  role: "user" | "ai";
-  text: string;
-};
+type Message =
+  | { id: number; role: "user" | "ai"; kind: "text"; text: string }
+  | { id: number; role: "user"; kind: "audio"; audioUrl: string; transcript?: string };
 
 type AnalysisStatus = {
   task_id: string;
@@ -28,8 +27,23 @@ type AnalysisStatus = {
 
 function buildTranscript(messages: Message[]) {
   return messages
-    .map((m) => (m.role === "user" ? `Я: ${m.text}` : `Собеседник: ${m.text}`))
+    .map((m) => {
+      const text =
+        m.kind === "text"
+          ? m.text
+          : (m.transcript || "(голосовое сообщение)");
+      return m.role === "user" ? `Я: ${text}` : `Собеседник: ${text}`;
+    })
     .join("\n");
+}
+
+function statusLabel(value: string) {
+  const v = String(value || "").toLowerCase();
+  if (v === "pending") return "в очереди";
+  if (v === "processing") return "в обработке";
+  if (v === "completed") return "готово";
+  if (v === "failed") return "ошибка";
+  return value;
 }
 
 export function SimulationChat(props: {
@@ -39,7 +53,7 @@ export function SimulationChat(props: {
   systemIntro: string;
 }) {
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: "ai", text: props.systemIntro },
+    { id: 1, role: "ai", kind: "text", text: props.systemIntro },
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -50,6 +64,7 @@ export function SimulationChat(props: {
   const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastVoiceMessageIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,6 +98,22 @@ export function SimulationChat(props: {
     return userMessages.length > 0;
   }, [messages]);
 
+  const addTextMessage = (text: string, sender: "user" | "ai") => {
+    setMessages((prev) => [...prev, { id: Date.now(), role: sender, kind: "text", text }]);
+  };
+
+  const addAudioMessage = (audioUrl: string) => {
+    const id = Date.now();
+    lastVoiceMessageIdRef.current = id;
+    setMessages((prev) => [...prev, { id, role: "user", kind: "audio", audioUrl }]);
+  };
+
+  const attachTranscriptToLastAudio = (text: string) => {
+    const id = lastVoiceMessageIdRef.current;
+    if (!id) return;
+    setMessages((prev) => prev.map((m) => (m.id === id && m.kind === "audio" ? { ...m, transcript: text } : m)));
+  };
+
   const sendUserMessage = async () => {
     const textToSend = input.trim();
     if (!textToSend) return;
@@ -90,18 +121,26 @@ export function SimulationChat(props: {
     setError(null);
     setInput("");
 
-    const nextMessages = [...messages, { id: Date.now(), role: "user" as const, text: textToSend }];
+    const nextMessages: Message[] = [...messages, { id: Date.now(), role: "user" as const, kind: "text", text: textToSend }];
     setMessages(nextMessages);
 
     setSending(true);
     try {
+      const apiMessages = nextMessages
+        .map((m) => {
+          if (m.kind === "text") return { role: m.role, text: m.text };
+          if (m.kind === "audio" && m.transcript) return { role: m.role, text: m.transcript };
+          return null;
+        })
+        .filter(Boolean) as Array<{ role: string; text: string }>;
+
       const res = await api.post(`/tests/simulations/${props.scenario}/reply`, {
-        messages: nextMessages.map((m) => ({ role: m.role, text: m.text })),
+        messages: apiMessages,
       });
 
       const reply = String(res.data?.reply ?? "").trim();
       if (reply) {
-        setMessages((prev) => [...prev, { id: Date.now() + 1, role: "ai", text: reply }]);
+        setMessages((prev) => [...prev, { id: Date.now() + 1, role: "ai", kind: "text", text: reply }]);
       }
     } catch (e: any) {
       console.error(e);
@@ -151,7 +190,16 @@ export function SimulationChat(props: {
                   : "bg-white rounded-tr-none border border-beige-300"
               }`}
             >
-              {msg.text}
+              {msg.kind === "audio" ? (
+                <div className="space-y-2">
+                  <audio controls src={msg.audioUrl} className="w-64" />
+                  {msg.transcript ? (
+                    <div className="text-xs text-brown-600">{msg.transcript}</div>
+                  ) : null}
+                </div>
+              ) : (
+                msg.text
+              )}
             </div>
           </div>
         ))}
@@ -178,7 +226,7 @@ export function SimulationChat(props: {
             <div className="text-brown-600 text-sm mt-2">Task: {taskId}</div>
             <div className="mt-4">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-beige-200 border border-beige-300 text-xs font-bold text-brown-800">
-                {status?.status || "pending"}
+                {statusLabel(status?.status || "pending")}
               </div>
             </div>
 
@@ -186,19 +234,19 @@ export function SimulationChat(props: {
               <div className="mt-5 space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                   <div className="text-brown-800">
-                    Comm: <span className="font-bold">{Math.round(status.result.communication_score)}</span>
+                    Коммуникация: <span className="font-bold">{Math.round(status.result.communication_score)}</span>
                   </div>
                   <div className="text-brown-800">
-                    EI: <span className="font-bold">{Math.round(status.result.emotional_intelligence_score)}</span>
+                    Эмоц. интеллект: <span className="font-bold">{Math.round(status.result.emotional_intelligence_score)}</span>
                   </div>
                   <div className="text-brown-800">
-                    CT: <span className="font-bold">{Math.round(status.result.critical_thinking_score)}</span>
+                    Крит. мышление: <span className="font-bold">{Math.round(status.result.critical_thinking_score)}</span>
                   </div>
                   <div className="text-brown-800">
-                    TM: <span className="font-bold">{Math.round(status.result.time_management_score)}</span>
+                    Тайм-менеджмент: <span className="font-bold">{Math.round(status.result.time_management_score)}</span>
                   </div>
                   <div className="text-brown-800">
-                    Lead: <span className="font-bold">{Math.round(status.result.leadership_score)}</span>
+                    Лидерство: <span className="font-bold">{Math.round(status.result.leadership_score)}</span>
                   </div>
                 </div>
                 {status.result.feedback ? (
@@ -223,6 +271,25 @@ export function SimulationChat(props: {
             placeholder="Напишите вашу реплику..."
             className="flex-1 bg-beige-200 border border-beige-300 rounded-xl px-4 py-3 text-brown-800 outline-none"
           />
+
+          <VoiceRecorder
+            uploadPath={`/tests/simulations/${props.scenario}/voice`}
+            extraFormFields={{
+              messages: JSON.stringify(
+                messages
+                  .map((m) => {
+                    if (m.kind === "text") return { role: m.role, text: m.text };
+                    if (m.kind === "audio" && m.transcript) return { role: m.role, text: m.transcript };
+                    return null;
+                  })
+                  .filter(Boolean)
+              ),
+            }}
+            onSendAudio={(audioUrl) => addAudioMessage(audioUrl)}
+            onSendText={(text, sender) => addTextMessage(text, sender)}
+            onRecognizedText={(text) => attachTranscriptToLastAudio(text)}
+          />
+
           <Button
             onClick={sendUserMessage}
             disabled={sending || finishing}

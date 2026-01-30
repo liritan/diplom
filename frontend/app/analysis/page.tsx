@@ -66,6 +66,8 @@ function formatDate(value: string) {
   });
 }
 
+const round1 = (value: number) => Math.round(value * 10) / 10;
+
 export default function AnalysisPage() {
   const [profile, setProfile] = useState<ProfileWithHistory | null>(null);
   const [results, setResults] = useState<AnalysisResult[]>([]);
@@ -94,11 +96,11 @@ export default function AnalysisPage() {
     const current = profile?.current;
     if (!current) return [];
     return [
-      { subject: "Communication", A: current.communication_score ?? 0, fullMark: 100 },
-      { subject: "Emotional Intelligence", A: current.emotional_intelligence_score ?? 0, fullMark: 100 },
-      { subject: "Critical Thinking", A: current.critical_thinking_score ?? 0, fullMark: 100 },
-      { subject: "Time Management", A: current.time_management_score ?? 0, fullMark: 100 },
-      { subject: "Leadership", A: current.leadership_score ?? 0, fullMark: 100 },
+      { subject: "Коммуникация", A: round1(current.communication ?? 0), fullMark: 100 },
+      { subject: "Эмоциональный интеллект", A: round1(current.emotional_intelligence ?? 0), fullMark: 100 },
+      { subject: "Критическое мышление", A: round1(current.critical_thinking ?? 0), fullMark: 100 },
+      { subject: "Тайм-менеджмент", A: round1(current.time_management ?? 0), fullMark: 100 },
+      { subject: "Лидерство", A: round1(current.leadership ?? 0), fullMark: 100 },
     ];
   }, [profile]);
 
@@ -109,11 +111,11 @@ export default function AnalysisPage() {
       .reverse()
       .map((h) => ({
         date: new Date(h.created_at).toLocaleDateString("ru-RU"),
-        Communication: h.communication_score,
-        "Emotional Intelligence": h.emotional_intelligence_score,
-        "Critical Thinking": h.critical_thinking_score,
-        "Time Management": h.time_management_score,
-        Leadership: h.leadership_score,
+        Коммуникация: round1(h.communication_score),
+        "Эмоциональный интеллект": round1(h.emotional_intelligence_score),
+        "Критическое мышление": round1(h.critical_thinking_score),
+        "Тайм-менеджмент": round1(h.time_management_score),
+        Лидерство: round1(h.leadership_score),
       }));
   }, [profile]);
 
@@ -192,11 +194,11 @@ export default function AnalysisPage() {
                         <YAxis domain={[0, 100]} tick={{ fill: "#5c4d3c", fontSize: 12 }} />
                         <Tooltip contentStyle={{ backgroundColor: "#fbf8f3", borderColor: "#e6dfd5", color: "#5c4d3c" }} />
                         <Legend />
-                        <Line type="monotone" dataKey="Communication" stroke="#a69076" dot={false} />
-                        <Line type="monotone" dataKey="Emotional Intelligence" stroke="#e2c08d" dot={false} />
-                        <Line type="monotone" dataKey="Critical Thinking" stroke="#5c4d3c" dot={false} />
-                        <Line type="monotone" dataKey="Time Management" stroke="#d4c5b0" dot={false} />
-                        <Line type="monotone" dataKey="Leadership" stroke="#c1b098" dot={false} />
+                        <Line type="monotone" dataKey="Коммуникация" stroke="#a69076" dot={false} />
+                        <Line type="monotone" dataKey="Эмоциональный интеллект" stroke="#e2c08d" dot={false} />
+                        <Line type="monotone" dataKey="Критическое мышление" stroke="#5c4d3c" dot={false} />
+                        <Line type="monotone" dataKey="Тайм-менеджмент" stroke="#d4c5b0" dot={false} />
+                        <Line type="monotone" dataKey="Лидерство" stroke="#c1b098" dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>

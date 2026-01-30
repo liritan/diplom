@@ -53,6 +53,15 @@ function normalizeOptionLabel(opt: any) {
   return JSON.stringify(opt);
 }
 
+function statusLabel(value: string) {
+  const v = String(value || "").toLowerCase();
+  if (v === "pending") return "в очереди";
+  if (v === "processing") return "в обработке";
+  if (v === "completed") return "готово";
+  if (v === "failed") return "ошибка";
+  return value;
+}
+
 export default function TestDetailsPage() {
   const params = useParams() as any;
   const testId = Number(params?.id);
@@ -244,18 +253,18 @@ export default function TestDetailsPage() {
                   <div className="text-brown-600 text-sm mt-2">Task: {taskId}</div>
                   <div className="mt-4">
                     <div className="inline-flex items-center px-3 py-1 rounded-full bg-beige-200 border border-beige-300 text-xs font-bold text-brown-800">
-                      {status?.status || "pending"}
+                      {statusLabel(status?.status || "pending")}
                     </div>
                   </div>
 
                   {status?.status === "completed" && status.result ? (
                     <div className="mt-5 space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                        <div className="text-brown-800">Comm: <span className="font-bold">{Math.round(status.result.communication_score)}</span></div>
-                        <div className="text-brown-800">EI: <span className="font-bold">{Math.round(status.result.emotional_intelligence_score)}</span></div>
-                        <div className="text-brown-800">CT: <span className="font-bold">{Math.round(status.result.critical_thinking_score)}</span></div>
-                        <div className="text-brown-800">TM: <span className="font-bold">{Math.round(status.result.time_management_score)}</span></div>
-                        <div className="text-brown-800">Lead: <span className="font-bold">{Math.round(status.result.leadership_score)}</span></div>
+                        <div className="text-brown-800">Коммуникация: <span className="font-bold">{Math.round(status.result.communication_score)}</span></div>
+                        <div className="text-brown-800">Эмоциональный интеллект: <span className="font-bold">{Math.round(status.result.emotional_intelligence_score)}</span></div>
+                        <div className="text-brown-800">Критическое мышление: <span className="font-bold">{Math.round(status.result.critical_thinking_score)}</span></div>
+                        <div className="text-brown-800">Тайм-менеджмент: <span className="font-bold">{Math.round(status.result.time_management_score)}</span></div>
+                        <div className="text-brown-800">Лидерство: <span className="font-bold">{Math.round(status.result.leadership_score)}</span></div>
                       </div>
                       {status.result.feedback ? (
                         <div className="text-sm text-brown-800 whitespace-pre-wrap">{status.result.feedback}</div>

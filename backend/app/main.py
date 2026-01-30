@@ -100,17 +100,15 @@ async def health_check():
 
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
-
-from fastapi import Request
-from sqlalchemy.exc import IntegrityError
 from app.db.session import AsyncSessionLocal
 from app.models.user import User
+from app.core.security import get_password_hash  # функция хеширования пароля
 
 @app.post(f"{settings.API_V1_STR}/debug/register")
 async def debug_register(request: Request):
     """
     Временный эндпоинт для тестирования регистрации на iPad.
-    Возвращает JSON с результатом попытки создать пользователя.
+    Создает пользователя с хешированным паролем.
     """
     data = await request.json()
     email = data.get("email")
@@ -119,9 +117,11 @@ async def debug_register(request: Request):
     if not email or not password:
         return {"status": "error", "message": "Email or password missing"}
 
+    hashed_password = get_password_hash(password)
+
     async with AsyncSessionLocal() as db:
         try:
-            user = User(email=email, password=password)
+            user = User(email=email, hashed_password=hashed_password)
             db.add(user)
             await db.commit()
             return {"status": "ok", "message": "User created", "email": email}

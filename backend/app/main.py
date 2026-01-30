@@ -96,3 +96,27 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+from fastapi import Request
+from sqlalchemy.exc import IntegrityError
+
+@app.post("/debug/register")
+async def debug_register(request: Request):
+    data = await request.json()
+    email = data.get("email")
+    password = data.get("password")
+
+    from app.models.user import User  # импорт модели пользователя
+    async with AsyncSessionLocal() as db:
+        try:
+            user = User(email=email, password=password)
+            db.add(user)
+            await db.commit()
+            return {"status": "ok", "message": "User created", "email": email}
+        except IntegrityError as e:
+            await db.rollback()
+            return {"status": "error", "message": "User already exists or other DB error", "details": str(e)}
+        except Exception as e:
+            await db.rollback()
+            return {"status": "error", "message": "Other error", "details": str(e)}

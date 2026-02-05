@@ -177,21 +177,3 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-from fastapi import FastAPI, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
-from app.db.session import get_db
-from app.models.user import User
-
-app = FastAPI()
-
-@app.delete("/delete-test-users")
-async def delete_test_users(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        delete(User).where(User.id.in_([6, 7]))
-    )
-    await db.commit()
-    return {
-        "status": "ok",
-        "deleted_rows": result.rowcount
-    }

@@ -37,6 +37,10 @@ function buildTranscript(messages: Message[]) {
     .join("\n");
 }
 
+function normalizeTranscript(text: string) {
+  return String(text || "").replace(/\s+/g, " ").trim();
+}
+
 function statusLabel(value: string) {
   const v = String(value || "").toLowerCase();
   if (v === "pending") return "в очереди";
@@ -47,10 +51,15 @@ function statusLabel(value: string) {
 }
 
 export function SimulationChat(props: {
-  scenario: "interview" | "conflict" | "negotiation";
+  scenario: string;
   title: string;
   subtitle: string;
   systemIntro: string;
+  apiPaths?: {
+    reply: string;
+    voice: string;
+    submit: string;
+  };
 }) {
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, role: "ai", kind: "text", text: props.systemIntro },
@@ -59,12 +68,70 @@ export function SimulationChat(props: {
   const [sending, setSending] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
+  const [hydrated, setHydrated] = useState(false);
+
   const [taskId, setTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [submittedTranscript, setSubmittedTranscript] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastVoiceMessageIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const key = `simulationChat:${props.scenario}`;
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.messages)) {
+        setMessages(parsed.messages);
+      }
+      if (typeof parsed?.input === "string") {
+        setInput(parsed.input);
+      }
+      if (typeof parsed?.taskId === "string" || parsed?.taskId === null) {
+        setTaskId(parsed.taskId);
+      }
+      if (parsed?.status && typeof parsed.status === "object") {
+        setStatus(parsed.status);
+      }
+      if (typeof parsed?.error === "string" || parsed?.error === null) {
+        setError(parsed.error);
+      }
+    } catch {
+      sessionStorage.removeItem(key);
+    } finally {
+      setHydrated(true);
+    }
+  }, [props.scenario]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const key = `simulationChat:${props.scenario}`;
+    try {
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({
+          messages,
+          input,
+          taskId,
+          status,
+          error,
+        })
+      );
+    } catch {
+    }
+  }, [hydrated, props.scenario, messages, input, taskId, status, error]);
+
+  useEffect(() => {
+    const s = String(status?.status || "").toLowerCase();
+    if (s === "completed" || s === "failed") {
+      const key = `simulationChat:${props.scenario}`;
+      sessionStorage.removeItem(key);
+    }
+  }, [props.scenario, status?.status]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -92,6 +159,17 @@ export function SimulationChat(props: {
       clearInterval(interval);
     };
   }, [taskId]);
+
+  const currentTranscript = useMemo(() => normalizeTranscript(buildTranscript(messages)), [messages]);
+
+  useEffect(() => {
+    if (!submittedTranscript) return;
+    if (currentTranscript !== submittedTranscript) {
+      setTaskId(null);
+      setStatus(null);
+      setSubmittedTranscript(null);
+    }
+  }, [currentTranscript, submittedTranscript]);
 
   const canFinish = useMemo(() => {
     const userMessages = messages.filter((m) => m.role === "user");
@@ -134,7 +212,7 @@ export function SimulationChat(props: {
         })
         .filter(Boolean) as Array<{ role: string; text: string }>;
 
-      const res = await api.post(`/tests/simulations/${props.scenario}/reply`, {
+      const res = await api.post(props.apiPaths?.reply || `/tests/simulations/${props.scenario}/reply`, {
         messages: apiMessages,
       });
 
@@ -156,8 +234,9 @@ export function SimulationChat(props: {
     setStatus(null);
     try {
       const conversation = buildTranscript(messages);
-      const res = await api.post(`/tests/simulations/${props.scenario}/submit`, { conversation });
+      const res = await api.post(props.apiPaths?.submit || `/tests/simulations/${props.scenario}/submit`, { conversation });
       setTaskId(res.data.task_id);
+      setSubmittedTranscript(currentTranscript);
     } catch (e: any) {
       console.error(e);
       setError(e?.response?.data?.detail || "Ошибка отправки симуляции");
@@ -193,9 +272,6 @@ export function SimulationChat(props: {
               {msg.kind === "audio" ? (
                 <div className="space-y-2">
                   <audio controls src={msg.audioUrl} className="w-64" />
-                  {msg.transcript ? (
-                    <div className="text-xs text-brown-600">{msg.transcript}</div>
-                  ) : null}
                 </div>
               ) : (
                 msg.text
@@ -273,7 +349,7 @@ export function SimulationChat(props: {
           />
 
           <VoiceRecorder
-            uploadPath={`/tests/simulations/${props.scenario}/voice`}
+            uploadPath={props.apiPaths?.voice || `/tests/simulations/${props.scenario}/voice`}
             extraFormFields={{
               messages: JSON.stringify(
                 messages
@@ -299,7 +375,7 @@ export function SimulationChat(props: {
           </Button>
           <Button
             onClick={finishAndAnalyze}
-            disabled={!canFinish || sending || finishing}
+            disabled={!canFinish || sending || finishing || (!!taskId && submittedTranscript === currentTranscript && status?.status !== "failed")}
             className="bg-white hover:bg-beige-200 text-brown-800 border border-beige-300 font-bold py-2 px-6 rounded-lg uppercase text-xs tracking-wider"
           >
             Завершить

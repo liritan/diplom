@@ -43,7 +43,7 @@ export default function AchievementsPage() {
   }, []);
 
   const achievements = useMemo<Achievement[]>(() => {
-    return [
+    const base: Achievement[] = [
       {
         id: "a1",
         title: "Первый анализ",
@@ -73,6 +73,43 @@ export default function AchievementsPage() {
         title: "Системный прогресс",
         description: "Соберите 10 событий (тесты + кейсы)",
         done: testsCount + casesCount >= 10,
+      },
+    ];
+
+    const baseDone = base.every((a) => a.done);
+    if (!baseDone) return base;
+
+    return [
+      ...base,
+      {
+        id: "a3",
+        title: "Пять анализов",
+        description: "Наберите 5 результатов анализа навыков",
+        done: analysisCount >= 5,
+      },
+      {
+        id: "t2",
+        title: "Пять тестов",
+        description: "Пройдите 5 тестов",
+        done: testsCount >= 5,
+      },
+      {
+        id: "c2",
+        title: "Пять кейсов/симуляций",
+        description: "Отправьте 5 кейсов/симуляций на анализ",
+        done: casesCount >= 5,
+      },
+      {
+        id: "m2",
+        title: "Регулярная практика",
+        description: "Соберите 25 событий (тесты + кейсы)",
+        done: testsCount + casesCount >= 25,
+      },
+      {
+        id: "m3",
+        title: "Большой прогресс",
+        description: "Соберите 50 событий (анализы + тесты + кейсы)",
+        done: analysisCount + testsCount + casesCount >= 50,
       },
     ];
   }, [analysisCount, testsCount, casesCount]);

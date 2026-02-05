@@ -11,6 +11,7 @@ interface Message {
   text?: string;
   audioUrl?: string;
   audioFetchPath?: string;
+  transcript?: string;
   sender: "user" | "ai";
 }
 
@@ -19,6 +20,7 @@ export default function ChatInterface() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastVoiceMessageIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -44,12 +46,18 @@ export default function ChatInterface() {
           const hasAudio = Boolean(m.audio_url);
           if (hasAudio && typeof id === "number") audioIds.push(id);
 
+          const transcript =
+            hasAudio && typeof m.message === "string" && m.message && m.message !== "(voice)"
+              ? m.message
+              : undefined;
+
           return {
             id,
             kind: hasAudio ? ("audio" as const) : ("text" as const),
             text: hasAudio ? undefined : m.message,
             audioUrl: undefined,
             audioFetchPath: hasAudio ? String(m.audio_url) : undefined,
+            transcript,
             sender: m.is_user ? ("user" as const) : ("ai" as const),
           };
         });
@@ -93,7 +101,15 @@ export default function ChatInterface() {
   };
 
   const addAudioMessage = (audioUrl: string, sender: "user" | "ai") => {
-    setMessages((prev) => [...prev, { id: Date.now(), kind: "audio", audioUrl, sender }]);
+    const id = Date.now();
+    lastVoiceMessageIdRef.current = id;
+    setMessages((prev) => [...prev, { id, kind: "audio", audioUrl, sender }]);
+  };
+
+  const attachTranscriptToLastAudio = (text: string) => {
+    const id = lastVoiceMessageIdRef.current;
+    if (!id) return;
+    setMessages((prev) => prev.map((m) => (m.id === id && m.kind === "audio" ? { ...m, transcript: text } : m)));
   };
 
   const handleSend = async () => {
@@ -145,11 +161,13 @@ export default function ChatInterface() {
               }`}
             >
               {msg.kind === "audio" ? (
-                msg.audioUrl ? (
-                  <audio controls src={msg.audioUrl} className="w-64" />
-                ) : (
-                  "Загрузка аудио..."
-                )
+                <div className="space-y-2">
+                  {msg.audioUrl ? (
+                    <audio controls src={msg.audioUrl} className="w-64" />
+                  ) : (
+                    "Загрузка аудио..."
+                  )}
+                </div>
               ) : (
                 msg.text
               )}
@@ -177,7 +195,11 @@ export default function ChatInterface() {
             className="flex-1 bg-transparent border-none focus:ring-0 text-brown-800 placeholder-brown-400 px-4 py-3 text-base outline-none"
           />
           
-          <VoiceRecorder onSendText={addTextMessage} onSendAudio={addAudioMessage} />
+          <VoiceRecorder
+            onSendText={addTextMessage}
+            onSendAudio={addAudioMessage}
+            onRecognizedText={attachTranscriptToLastAudio}
+          />
 
           <div className="flex items-center px-2">
             <Button 

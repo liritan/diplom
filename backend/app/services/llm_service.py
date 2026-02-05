@@ -126,6 +126,16 @@ ANALYSIS_PROMPT = """
 4. Тайм-менеджмент (time_management)
 5. Лидерство (leadership)
 
+ВАЖНО: оценка должна быть строгой и доказательной.
+- 90–100 ставь только при явных, конкретных примерах поведения и решений.
+- 70–89 — выше среднего, если есть убедительные признаки навыка.
+- 50–69 — средний уровень, если признаки слабые/частичные.
+- 0–49 — ниже среднего или если навык не проявлен.
+- Если в тексте НЕТ явных данных по навыку, не завышай: ставь низко/средне-низко.
+
+ВАЖНО ДЛЯ ГОЛОСОВЫХ: текст может быть распознан из голосового сообщения.
+Если по формулировкам заметны сарказм/ирония/пассивная агрессия, учитывай это в оценке (особенно communication и emotional_intelligence).
+
 ФОРМАТ ОТВЕТА (строго JSON):
 {{
     "communication": <число 0-100>,
@@ -149,6 +159,8 @@ PLAN_GENERATION_PROMPT = """
 - Тайм-менеджмент: {time_management_score}/100
 - Лидерство: {leadership_score}/100
 
+УРОВЕНЬ ПОЛЬЗОВАТЕЛЯ: {target_difficulty}
+
 СЛАБЫЕ СТОРОНЫ: {weaknesses}
 
 ПРЕДЫДУЩИЕ МАТЕРИАЛЫ (не повторять):
@@ -159,6 +171,11 @@ PLAN_GENERATION_PROMPT = """
 1. 5-7 теоретических материалов (статьи, видео, курсы)
 2. 3-5 практических заданий
 3. 2-3 рекомендации по тестам/кейсам
+
+ВАЖНО:
+- Подбирай материалы и задания по уровню пользователя.
+- Поле difficulty у материалов выставляй преимущественно как {target_difficulty}.
+- Допускается смешивание уровней, но не больше 1-2 материалов выше уровня.
 
 ФОРМАТ ОТВЕТА (строго JSON):
 {{
@@ -310,6 +327,7 @@ class LLMService:
                 
                 # Parse and validate the response
                 parsed_data = self._parse_llm_response(response_text, "skill_scores")
+                parsed_data = self._calibrate_free_text_scores(parsed_data, text)
                 
                 # Create SkillScores object
                 skill_scores = SkillScores(
@@ -768,6 +786,20 @@ class LLMService:
         
         previous_materials_text = "\n".join(previous_materials) if previous_materials else "Нет предыдущих материалов"
         weaknesses_text = ", ".join(weaknesses) if weaknesses else "Не определены"
+
+        avg_score = (
+            float(profile.communication_score or 0.0)
+            + float(profile.emotional_intelligence_score or 0.0)
+            + float(profile.critical_thinking_score or 0.0)
+            + float(profile.time_management_score or 0.0)
+            + float(profile.leadership_score or 0.0)
+        ) / 5.0
+        if avg_score >= 70:
+            target_difficulty = "advanced"
+        elif avg_score >= 40:
+            target_difficulty = "intermediate"
+        else:
+            target_difficulty = "beginner"
         
         prompt = PLAN_GENERATION_PROMPT.format(
             communication_score=profile.communication_score,
@@ -775,6 +807,7 @@ class LLMService:
             critical_thinking_score=profile.critical_thinking_score,
             time_management_score=profile.time_management_score,
             leadership_score=profile.leadership_score,
+            target_difficulty=target_difficulty,
             weaknesses=weaknesses_text,
             previous_materials=previous_materials_text
         )
@@ -936,6 +969,74 @@ class LLMService:
                 raw = 70 + (raw - 70) * 0.5
             raw *= coverage_factor
             calibrated[key] = max(0.0, min(100.0, raw))
+
+        return calibrated
+
+    def _calibrate_free_text_scores(
+        self,
+        data: Dict[str, Any],
+        text: str,
+    ) -> Dict[str, Any]:
+        calibrated = dict(data)
+
+        raw_text = str(text or "")
+        lowered = raw_text.lower()
+        word_count = len([w for w in lowered.split() if w.strip()])
+
+        tm_keywords = [
+            "план",
+            "планир",
+            "дедлайн",
+            "срок",
+            "приорит",
+            "распис",
+            "календар",
+            "задач",
+            "тайм",
+            "времен",
+            "успева",
+        ]
+        leadership_keywords = [
+            "команд",
+            "руковод",
+            "лидер",
+            "делег",
+            "ответствен",
+            "инициатив",
+            "мотивир",
+            "управлен",
+        ]
+
+        tm_evidence = any(k in lowered for k in tm_keywords)
+        leadership_evidence = any(k in lowered for k in leadership_keywords)
+
+        # General conservative compression for free-text.
+        for key in [
+            "communication",
+            "emotional_intelligence",
+            "critical_thinking",
+            "time_management",
+            "leadership",
+        ]:
+            try:
+                raw = float(calibrated.get(key, 0))
+            except Exception:
+                raw = 0.0
+
+            if raw > 70:
+                raw = 70 + (raw - 70) * 0.4
+
+            if word_count < 25:
+                raw *= 0.85
+
+            calibrated[key] = max(0.0, min(100.0, raw))
+
+        # Skill-specific caps if there's no evidence in text.
+        if not tm_evidence:
+            calibrated["time_management"] = min(float(calibrated.get("time_management", 0.0)), 50.0)
+
+        if not leadership_evidence:
+            calibrated["leadership"] = min(float(calibrated.get("leadership", 0.0)), 50.0)
 
         return calibrated
     

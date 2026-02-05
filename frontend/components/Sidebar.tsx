@@ -27,6 +27,7 @@ const menuItems = [
   {
     category: "РОЛЕВЫЕ ИГРЫ",
     items: [
+      { name: "Все ролевые игры", icon: Users, href: "/simulation" },
       { name: "Собеседование", icon: Users, href: "/simulation/interview" },
       { name: "Конфликт в команде", icon: MessageCircle, href: "/simulation/conflict" },
       { name: "Переговоры", icon: Mic, href: "/simulation/negotiation" },

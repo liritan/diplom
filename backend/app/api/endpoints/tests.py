@@ -1,5 +1,6 @@
 import json
 from typing import Any, List
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, File, UploadFile, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,7 @@ from app.api import deps
 from app.db.session import get_db
 from app.models.content import Test, Question, UserTestResult, CaseSolution
 from app.models.user import User
+from app.models.analysis import AnalysisTask
 from app.schemas.content import (
     Test as TestSchema,
     TestCreate,
@@ -80,6 +82,41 @@ async def submit_test(
     Requirements: 1.3
     """
     try:
+        now_utc = datetime.now(timezone.utc)
+        lookback = now_utc - timedelta(minutes=10)
+
+        recent_results = await db.execute(
+            select(UserTestResult)
+            .where(
+                UserTestResult.user_id == current_user.id,
+                UserTestResult.test_id == test_id,
+                UserTestResult.completed_at >= lookback,
+            )
+            .order_by(UserTestResult.completed_at.desc())
+            .limit(20)
+        )
+        for existing in list(recent_results.scalars().all()):
+            if (existing.details or {}) != (result_in.answers or {}):
+                continue
+            task_row = await db.execute(
+                select(AnalysisTask)
+                .where(
+                    AnalysisTask.user_id == current_user.id,
+                    AnalysisTask.response_type == "test",
+                    AnalysisTask.response_id == existing.id,
+                )
+                .order_by(AnalysisTask.created_at.desc())
+                .limit(1)
+            )
+            existing_task = task_row.scalars().first()
+            if existing_task and str(existing_task.status).lower() in {"pending", "processing", "completed"}:
+                return {
+                    "result_id": existing.id,
+                    "task_id": existing_task.id,
+                    "status": existing_task.status,
+                    "message": "Этот тест уже был отправлен на анализ. Возвращаю существующий результат.",
+                }
+
         # 1. Save Raw Result
         db_result = UserTestResult(
             user_id=current_user.id,
@@ -170,6 +207,35 @@ async def submit_case_solution(
     if not test:
         raise HTTPException(status_code=404, detail="Test not found")
 
+    now_utc = datetime.now(timezone.utc)
+    lookback = now_utc - timedelta(minutes=10)
+    recent_solutions = await db.execute(
+        select(CaseSolution)
+        .where(
+            CaseSolution.user_id == current_user.id,
+            CaseSolution.test_id == test_id,
+            CaseSolution.created_at >= lookback,
+        )
+        .order_by(CaseSolution.created_at.desc())
+        .limit(20)
+    )
+    for existing in list(recent_solutions.scalars().all()):
+        if (existing.solution or "").strip() != (payload.solution or "").strip():
+            continue
+        if existing.analysis_task_id:
+            status_value = "pending"
+            task_row = await db.execute(
+                select(AnalysisTask).where(AnalysisTask.id == existing.analysis_task_id)
+            )
+            task_obj = task_row.scalars().first()
+            if task_obj is not None:
+                status_value = task_obj.status
+            return {
+                "solution_id": existing.id,
+                "task_id": existing.analysis_task_id,
+                "status": status_value,
+            }
+
     solution_row = CaseSolution(
         user_id=current_user.id,
         test_id=test_id,
@@ -222,6 +288,36 @@ async def submit_simulation(
         db.add(test)
         await db.commit()
         await db.refresh(test)
+
+    now_utc = datetime.now(timezone.utc)
+    lookback = now_utc - timedelta(minutes=10)
+    recent_solutions = await db.execute(
+        select(CaseSolution)
+        .where(
+            CaseSolution.user_id == current_user.id,
+            CaseSolution.test_id == test.id,
+            CaseSolution.created_at >= lookback,
+        )
+        .order_by(CaseSolution.created_at.desc())
+        .limit(20)
+    )
+    for existing in list(recent_solutions.scalars().all()):
+        if (existing.solution or "").strip() != (payload.conversation or "").strip():
+            continue
+        if existing.analysis_task_id:
+            status_value = "pending"
+            task_row = await db.execute(
+                select(AnalysisTask).where(AnalysisTask.id == existing.analysis_task_id)
+            )
+            task_obj = task_row.scalars().first()
+            if task_obj is not None:
+                status_value = task_obj.status
+            return {
+                "test_id": test.id,
+                "solution_id": existing.id,
+                "task_id": existing.analysis_task_id,
+                "status": status_value,
+            }
 
     solution_row = CaseSolution(
         user_id=current_user.id,
@@ -345,6 +441,169 @@ async def simulation_voice_message(
         "response": reply,
         "user_text": user_text,
         "status": "ok",
+    }
+
+
+@router.post("/{test_id}/simulation/reply", response_model=dict)
+async def simulation_reply_by_test(
+    *,
+    test_id: int,
+    payload: SimulationReplyRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    result = await db.execute(select(Test).where(Test.id == test_id))
+    test = result.scalars().first()
+    if not test or str(test.type).lower() != "simulation":
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    transcript_lines = []
+    for m in payload.messages:
+        speaker = "Пользователь" if m.role == "user" else "Собеседник"
+        transcript_lines.append(f"{speaker}: {m.text}")
+
+    transcript = "\n".join(transcript_lines)
+    prompt = (
+        f"Ты участвуешь в симуляции '{test.title}'. "
+        "Ты играешь роль собеседника (вторая сторона). "
+        "Пользователь пишет только свои реплики. "
+        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
+        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
+        f"Диалог:\n{transcript}\n\nСобеседник:"
+    )
+
+    reply = await yandex_service.get_chat_response(prompt)
+    return {"reply": reply}
+
+
+@router.post("/{test_id}/simulation/voice", response_model=dict)
+async def simulation_voice_message_by_test(
+    *,
+    test_id: int,
+    file: UploadFile = File(...),
+    messages: str = Form("[]"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    result = await db.execute(select(Test).where(Test.id == test_id))
+    test = result.scalars().first()
+    if not test or str(test.type).lower() != "simulation":
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    audio_content = await file.read()
+    user_text = await yandex_service.speech_to_text(audio_content)
+    if not user_text:
+        return {
+            "response": "Извините, я не смог распознать ваше сообщение.",
+            "user_text": "",
+            "status": "failed",
+        }
+
+    try:
+        history = json.loads(messages) if messages else []
+        if not isinstance(history, list):
+            history = []
+    except Exception:
+        history = []
+
+    transcript_lines = []
+    for m in history:
+        if not isinstance(m, dict):
+            continue
+        role = m.get("role")
+        text = m.get("text")
+        if not role or not text:
+            continue
+        speaker = "Пользователь" if role == "user" else "Собеседник"
+        transcript_lines.append(f"{speaker}: {text}")
+
+    transcript_lines.append(f"Пользователь: {user_text}")
+    transcript = "\n".join(transcript_lines)
+
+    prompt = (
+        f"Ты участвуешь в симуляции '{test.title}'. "
+        "Ты играешь роль собеседника (вторая сторона). "
+        "Пользователь пишет только свои реплики. "
+        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
+        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
+        f"Диалог:\n{transcript}\n\nСобеседник:"
+    )
+
+    reply = await yandex_service.get_chat_response(prompt)
+    return {
+        "response": reply,
+        "user_text": user_text,
+        "status": "ok",
+    }
+
+
+@router.post("/{test_id}/simulation/submit", response_model=dict)
+async def submit_simulation_by_test(
+    *,
+    db: AsyncSession = Depends(get_db),
+    test_id: int,
+    payload: SimulationSubmit,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    result = await db.execute(select(Test).where(Test.id == test_id))
+    test = result.scalars().first()
+    if not test or str(test.type).lower() != "simulation":
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    now_utc = datetime.now(timezone.utc)
+    lookback = now_utc - timedelta(minutes=10)
+    recent_solutions = await db.execute(
+        select(CaseSolution)
+        .where(
+            CaseSolution.user_id == current_user.id,
+            CaseSolution.test_id == test.id,
+            CaseSolution.created_at >= lookback,
+        )
+        .order_by(CaseSolution.created_at.desc())
+        .limit(20)
+    )
+    for existing in list(recent_solutions.scalars().all()):
+        if (existing.solution or "").strip() != (payload.conversation or "").strip():
+            continue
+        if existing.analysis_task_id:
+            status_value = "pending"
+            task_row = await db.execute(
+                select(AnalysisTask).where(AnalysisTask.id == existing.analysis_task_id)
+            )
+            task_obj = task_row.scalars().first()
+            if task_obj is not None:
+                status_value = task_obj.status
+            return {
+                "test_id": test.id,
+                "solution_id": existing.id,
+                "task_id": existing.analysis_task_id,
+                "status": status_value,
+            }
+
+    solution_row = CaseSolution(
+        user_id=current_user.id,
+        test_id=test.id,
+        solution=payload.conversation,
+    )
+    db.add(solution_row)
+    await db.commit()
+    await db.refresh(solution_row)
+
+    analysis_task = await analysis_service.analyze_case_solution(
+        user_id=current_user.id,
+        case_id=test.id,
+        solution=payload.conversation,
+        solution_id=solution_row.id,
+        db=db,
+        background_tasks=background_tasks,
+    )
+
+    return {
+        "test_id": test.id,
+        "solution_id": solution_row.id,
+        "task_id": analysis_task.id,
+        "status": "pending",
     }
 
 

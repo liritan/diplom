@@ -71,6 +71,21 @@ class DevelopmentPlan(BaseModel):
         from_attributes = True
 
 
+class LibraryMaterialItem(MaterialItem):
+    plan_id: int
+    plan_generated_at: datetime
+
+
+class LibraryTaskItem(TaskItem):
+    plan_id: int
+    plan_generated_at: datetime
+
+
+class PlanLibraryResponse(BaseModel):
+    materials: List[LibraryMaterialItem]
+    tasks: List[LibraryTaskItem]
+
+
 class DevelopmentPlanWithProgress(BaseModel):
     """Schema for development plan with progress tracking"""
     id: int

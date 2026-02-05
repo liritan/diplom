@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { Card, Button } from "@/components/ui/common";
@@ -18,30 +18,63 @@ export default function Dashboard() {
   const [planProgress, setPlanProgress] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchStats = useCallback(
+    async (showLoading: boolean) => {
+      if (!user) return;
+      if (showLoading) setLoading(true);
+      try {
+        const [p, a, t, plan] = await Promise.all([
+          api.get("/profiles/me"),
+          api.get("/analysis/me/results", { params: { limit: 200 } }),
+          api.get("/tests/me/results", { params: { limit: 200 } }),
+          api.get("/plans/me/active"),
+        ]);
+        setProfile(p.data);
+        setAnalysisCount(Array.isArray(a.data) ? a.data.length : 0);
+        setTestCount(Array.isArray(t.data) ? t.data.length : 0);
+        setPlanProgress(plan.data?.progress?.percentage ?? null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (showLoading) setLoading(false);
+      }
+    },
+    [user]
+  );
+
   useEffect(() => {
-    if (user) {
-      const run = async () => {
-        setLoading(true);
-        try {
-          const [p, a, t, plan] = await Promise.all([
-            api.get("/profiles/me"),
-            api.get("/analysis/me/results", { params: { limit: 200 } }),
-            api.get("/tests/me/results", { params: { limit: 200 } }),
-            api.get("/plans/me/active"),
-          ]);
-          setProfile(p.data);
-          setAnalysisCount(Array.isArray(a.data) ? a.data.length : 0);
-          setTestCount(Array.isArray(t.data) ? t.data.length : 0);
-          setPlanProgress(plan.data?.progress?.percentage ?? null);
-        } catch (err) {
-          console.error(err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      run();
-    }
-  }, [user]);
+    if (!user) return;
+
+    let disposed = false;
+    fetchStats(true);
+
+    const interval = window.setInterval(() => {
+      if (disposed) return;
+      fetchStats(false);
+    }, 15000);
+
+    const onFocus = () => {
+      if (disposed) return;
+      fetchStats(false);
+    };
+
+    const onVisibilityChange = () => {
+      if (disposed) return;
+      if (document.visibilityState === "visible") {
+        fetchStats(false);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [user, fetchStats]);
 
   const avgScore = profile
     ? (Number(profile.communication_score ?? 0)

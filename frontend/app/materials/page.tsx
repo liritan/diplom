@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import api from "@/lib/api";
 import { Card, Button } from "@/components/ui/common";
@@ -58,6 +59,15 @@ function materialTypeLabel(value: string) {
   if (v === "video") return "Видео";
   if (v === "course") return "Курс";
   return value;
+}
+
+function normalizeExternalUrl(raw: string) {
+  const url = String(raw || "").trim();
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("/")) return url;
+  return `https://${url}`;
 }
 
 export default function MaterialsPage() {
@@ -119,6 +129,13 @@ export default function MaterialsPage() {
         <div className="bg-beige-100 border-b border-beige-300 px-8 py-6">
           <h1 className="text-2xl font-bold text-brown-800">Материалы</h1>
           <p className="text-brown-600 text-sm mt-1">Ваш персональный план развития: материалы, задания и рекомендации</p>
+          <div className="mt-4">
+            <Link href="/materials/library">
+              <Button className="bg-white hover:bg-beige-200 text-brown-800 border border-beige-300 font-bold py-2 px-6 rounded-lg uppercase text-xs tracking-wider">
+                Каталог материалов и заданий
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="p-8 overflow-y-auto space-y-8">
@@ -137,7 +154,7 @@ export default function MaterialsPage() {
                     {materials.map((m) => (
                       <a
                         key={m.id}
-                        href={m.url}
+                        href={normalizeExternalUrl(m.url)}
                         target="_blank"
                         rel="noreferrer"
                         className="block bg-beige-100 border border-beige-300 rounded-xl p-5 hover:bg-beige-200 transition-colors"
@@ -214,7 +231,7 @@ export default function MaterialsPage() {
                   {recommendedTests.map((rt) => (
                     <a
                       key={rt.test_id}
-                      href={`/tests/${rt.test_id}`}
+                      href={rt.test_id && rt.test_id > 0 ? `/tests/${rt.test_id}` : "/tests"}
                       className="block bg-beige-100 border border-beige-300 rounded-xl p-5 hover:bg-beige-200 transition-colors"
                     >
                       <div className="text-sm font-bold text-brown-800">{rt.title}</div>

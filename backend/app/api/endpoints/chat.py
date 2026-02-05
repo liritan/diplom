@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.responses import Response
 from typing import Optional
@@ -5,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api import deps
 from app.db.session import get_db
+from app.models.analysis import AnalysisTask
 from app.models.chat import ChatMessage, ChatAudio
 from app.models.user import User
 from app.core.yandex_service import yandex_service
@@ -110,25 +113,38 @@ async def voice_message(
                 "status": "failed"
             }
         
+        user_voice_msg.message = user_text
+
         # 2. AI Processing
         ai_response = await yandex_service.get_chat_response(user_text)
-        
-        # 3. Trigger background analysis (saves ChatMessage and creates AnalysisTask)
-        analysis_task = await analysis_service.analyze_chat_message(
+
+        analysis_service._validate_chat_message(user_text)
+        task_id = str(uuid.uuid4())
+        analysis_task = AnalysisTask(
+            id=task_id,
             user_id=current_user.id,
-            message=user_text,
-            db=db,
-            background_tasks=background_tasks
+            response_type="chat",
+            response_id=user_voice_msg.id,
+            status="pending",
+            retry_count=0,
+        )
+        db.add(analysis_task)
+        user_voice_msg.analysis_task_id = task_id
+
+        from app.tasks.background_tasks import process_analysis_background
+        background_tasks.add_task(
+            process_analysis_background,
+            task_id=task_id,
+            user_id=current_user.id,
+            response_type="chat",
+            response_data={"message": user_text, "response_id": user_voice_msg.id},
         )
 
-        user_voice_msg.analysis_task_id = analysis_task.id
-
-        # Save AI response to chat history
         db.add(ChatMessage(
             user_id=current_user.id,
             message=ai_response,
             is_user=False,
-            analysis_task_id=analysis_task.id
+            analysis_task_id=task_id
         ))
         await db.commit()
         
@@ -138,7 +154,7 @@ async def voice_message(
         return {
             "response": ai_response, 
             "user_text": user_text,
-            "task_id": analysis_task.id,
+            "task_id": task_id,
             "status": "pending"
         }
     except ValueError as e:

@@ -10,14 +10,13 @@ import logging
 from typing import Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.session import AsyncSessionLocal
 from app.models.analysis import AnalysisTask, AnalysisResult
-from app.models.chat import ChatMessage
-from app.models.content import UserTestResult, Test, CaseSolution
-from app.models.profile import SoftSkillsProfile
+from app.models.chat import ChatMessage, ChatAudio
+from app.models.content import UserTestResult, CaseSolution, Test
 from app.services.llm_service import LLMService, LLMUnavailableError, LLMRateLimitError, LLMInvalidResponseError
 from app.services.profile_service import ProfileService
 from app.services.plan_service import PlanService
@@ -115,10 +114,18 @@ async def _process_analysis_with_db(
             chat_message = msg_result.scalar_one_or_none()
             if chat_message:
                 text_to_analyze = chat_message.message
-                context = "Анализ сообщения из чат-симулятора"
+                audio_row = await db.execute(
+                    select(ChatAudio).where(ChatAudio.chat_message_id == chat_message.id)
+                )
+                has_audio = audio_row.scalar_one_or_none() is not None
+                context = (
+                    "Анализ голосового сообщения пользователя (текст распознан из аудио; учитывай сарказм/иронию)"
+                    if has_audio
+                    else "Анализ текстового сообщения пользователя"
+                )
         else:
             text_to_analyze = response_data.get("message")
-            context = "Анализ сообщения из чат-симулятора"
+            context = "Анализ текстового сообщения пользователя"
     
     elif response_type == "test":
         test_id = response_data.get("test_id")

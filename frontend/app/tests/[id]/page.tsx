@@ -62,6 +62,16 @@ function statusLabel(value: string) {
   return value;
 }
 
+function stableStringify(obj: any) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    return JSON.stringify(obj);
+  }
+  const keys = Object.keys(obj).sort();
+  const sorted: Record<string, any> = {};
+  for (const k of keys) sorted[k] = obj[k];
+  return JSON.stringify(sorted);
+}
+
 export default function TestDetailsPage() {
   const params = useParams() as any;
   const testId = Number(params?.id);
@@ -76,6 +86,8 @@ export default function TestDetailsPage() {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [submittedFingerprint, setSubmittedFingerprint] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -116,6 +128,25 @@ export default function TestDetailsPage() {
     };
   }, [taskId]);
 
+  const currentFingerprint = useMemo(() => {
+    if (isCaseType(test?.type || "")) {
+      return `case:${caseSolution.trim()}`;
+    }
+    return `quiz:${stableStringify(answers || {})}`;
+  }, [answers, caseSolution, test?.type]);
+
+  useEffect(() => {
+    if (!submittedFingerprint) return;
+    if (currentFingerprint !== submittedFingerprint) {
+      setTaskId(null);
+      setStatus(null);
+      setSubmittedFingerprint(null);
+    }
+  }, [currentFingerprint, submittedFingerprint]);
+
+  const canSubmitSamePayload =
+    !!taskId && submittedFingerprint === currentFingerprint && status?.status !== "failed";
+
   const questions = useMemo(() => test?.questions ?? [], [test]);
 
   const submitQuiz = async () => {
@@ -126,6 +157,7 @@ export default function TestDetailsPage() {
         answers,
       });
       setTaskId(res.data.task_id);
+      setSubmittedFingerprint(currentFingerprint);
     } catch (e: any) {
       console.error(e);
       setError(e?.response?.data?.detail || "Ошибка отправки теста");
@@ -142,6 +174,7 @@ export default function TestDetailsPage() {
         solution: caseSolution,
       });
       setTaskId(res.data.task_id);
+      setSubmittedFingerprint(currentFingerprint);
     } catch (e: any) {
       console.error(e);
       setError(e?.response?.data?.detail || "Ошибка отправки решения кейса");
@@ -185,7 +218,7 @@ export default function TestDetailsPage() {
                   />
                   <div className="mt-4">
                     <Button
-                      disabled={submitting || !caseSolution.trim()}
+                      disabled={submitting || !caseSolution.trim() || canSubmitSamePayload}
                       onClick={submitCase}
                       className="bg-accent-button hover:bg-accent-buttonHover text-white font-bold py-2 px-6 rounded-lg uppercase text-xs tracking-wider"
                     >
@@ -237,7 +270,7 @@ export default function TestDetailsPage() {
 
                   <div className="mt-6">
                     <Button
-                      disabled={submitting}
+                      disabled={submitting || canSubmitSamePayload}
                       onClick={submitQuiz}
                       className="bg-accent-button hover:bg-accent-buttonHover text-white font-bold py-2 px-6 rounded-lg uppercase text-xs tracking-wider"
                     >

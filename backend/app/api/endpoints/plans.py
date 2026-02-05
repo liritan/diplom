@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from app.api import deps
 from app.db.session import get_db
 from app.models.user import User
-from app.models.profile import SoftSkillsProfile
+from app.models.profile import SoftSkillsProfile, DevelopmentPlan
 from app.models.analysis import AnalysisResult
-from app.schemas.plan import DevelopmentPlanWithProgress
+from app.schemas.plan import DevelopmentPlanWithProgress, PlanLibraryResponse, LibraryMaterialItem, LibraryTaskItem
 from app.services.plan_service import plan_service
 from app.core.config import settings
 
@@ -50,6 +50,14 @@ async def get_active_plan(
         
         if plan is None:
             return None
+
+        profile_row = await db.execute(
+            select(SoftSkillsProfile).where(SoftSkillsProfile.user_id == current_user.id)
+        )
+        profile = profile_row.scalar_one_or_none()
+        if profile is not None:
+            await plan_service.sanitize_plan_materials_if_needed(plan, profile, db)
+            await db.refresh(plan)
         
         # Parse content JSON
         content = plan.content
@@ -78,6 +86,73 @@ async def get_active_plan(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при получении плана развития: {str(e)}")
+
+
+@router.get("/me/library", response_model=PlanLibraryResponse)
+async def get_plan_library(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    try:
+        plans_res = await db.execute(
+            select(DevelopmentPlan)
+            .where(DevelopmentPlan.user_id == current_user.id)
+            .order_by(DevelopmentPlan.generated_at.desc())
+        )
+        plans = plans_res.scalars().all()
+
+        materials: list[LibraryMaterialItem] = []
+        tasks: list[LibraryTaskItem] = []
+
+        for plan in plans:
+            content = plan.content
+            if not isinstance(content, dict):
+                continue
+
+            plan_materials = content.get("materials")
+            if isinstance(plan_materials, list):
+                for m in plan_materials:
+                    if not isinstance(m, dict):
+                        continue
+                    try:
+                        materials.append(
+                            LibraryMaterialItem(
+                                plan_id=plan.id,
+                                plan_generated_at=plan.generated_at,
+                                id=str(m.get("id", "")),
+                                title=str(m.get("title", "")),
+                                url=str(m.get("url", "")),
+                                type=str(m.get("type", "")),
+                                skill=str(m.get("skill", "")),
+                                difficulty=str(m.get("difficulty", "")),
+                            )
+                        )
+                    except Exception:
+                        continue
+
+            plan_tasks = content.get("tasks")
+            if isinstance(plan_tasks, list):
+                for t in plan_tasks:
+                    if not isinstance(t, dict):
+                        continue
+                    try:
+                        tasks.append(
+                            LibraryTaskItem(
+                                plan_id=plan.id,
+                                plan_generated_at=plan.generated_at,
+                                id=str(t.get("id", "")),
+                                description=str(t.get("description", "")),
+                                skill=str(t.get("skill", "")),
+                                status=str(t.get("status", "pending")),
+                                completed_at=t.get("completed_at"),
+                            )
+                        )
+                    except Exception:
+                        continue
+
+        return PlanLibraryResponse(materials=materials, tasks=tasks)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении каталога: {str(e)}")
 
 
 @router.post("/me/tasks/{task_id}/complete", response_model=TaskCompletionResponse)

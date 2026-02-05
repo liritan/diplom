@@ -1,9 +1,10 @@
 from typing import List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
+from app.models.analysis import AnalysisResult
 from app.models.profile import SoftSkillsProfile, ProfileHistory
 from app.schemas.analysis import SkillScores
 from app.schemas.profile import ProfileWithHistory, StrengthsWeaknesses
@@ -59,22 +60,33 @@ class ProfileService:
         
         # Save current state to history before updating (Requirement 2.2, 7.2)
         await self._save_profile_history(profile, db)
-        
-        # Update scores using weighted average
+
+        w = max(0.0, min(1.0, float(weight or 0.0)))
+
         profile.communication_score = self._calculate_weighted_average(
-            profile.communication_score, new_scores.communication, weight
+            float(profile.communication_score or 0.0),
+            float(new_scores.communication or 0.0),
+            w,
         )
         profile.emotional_intelligence_score = self._calculate_weighted_average(
-            profile.emotional_intelligence_score, new_scores.emotional_intelligence, weight
+            float(profile.emotional_intelligence_score or 0.0),
+            float(new_scores.emotional_intelligence or 0.0),
+            w,
         )
         profile.critical_thinking_score = self._calculate_weighted_average(
-            profile.critical_thinking_score, new_scores.critical_thinking, weight
+            float(profile.critical_thinking_score or 0.0),
+            float(new_scores.critical_thinking or 0.0),
+            w,
         )
         profile.time_management_score = self._calculate_weighted_average(
-            profile.time_management_score, new_scores.time_management, weight
+            float(profile.time_management_score or 0.0),
+            float(new_scores.time_management or 0.0),
+            w,
         )
         profile.leadership_score = self._calculate_weighted_average(
-            profile.leadership_score, new_scores.leadership, weight
+            float(profile.leadership_score or 0.0),
+            float(new_scores.leadership or 0.0),
+            w,
         )
         
         await db.flush()

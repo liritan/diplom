@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel
 
 from app.api import deps
@@ -81,6 +82,10 @@ class AdminUserStats(BaseModel):
 
 class SetUserPasswordPayload(BaseModel):
     new_password: str
+
+
+class UpdateUserPayload(BaseModel):
+    full_name: Optional[str] = None
 
 
 @router.post("/retry-failed", response_model=RetryResponse)
@@ -177,6 +182,27 @@ async def admin_set_user_password(
     db.add(user)
     await db.commit()
     return {"status": "ok"}
+
+
+@router.patch("/users/{user_id}", response_model=UserSchema)
+async def admin_update_user(
+    user_id: int,
+    payload: UpdateUserPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_superuser),
+) -> Any:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if payload.full_name is not None:
+        user.full_name = payload.full_name.strip() or None
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
 @router.get("/users/{user_id}/profile", response_model=Optional[SoftSkillsProfileSchema])
@@ -465,6 +491,7 @@ async def admin_add_material(
     material_payload = jsonable_encoder(material_in)
     materials.append(material_payload)
     plan.content = jsonable_encoder(content)
+    flag_modified(plan, "content")
     await db.commit()
     await db.refresh(plan)
     return MaterialItem(**material_payload)
@@ -495,6 +522,7 @@ async def admin_update_material(
     if material_in.difficulty is not None:
         material["difficulty"] = material_in.difficulty
     plan.content = jsonable_encoder(content)
+    flag_modified(plan, "content")
     await db.commit()
     await db.refresh(plan)
     return MaterialItem(**material)
@@ -515,6 +543,7 @@ async def admin_delete_material(
         raise HTTPException(status_code=404, detail="Материал не найден")
     materials.pop(index)
     plan.content = jsonable_encoder(content)
+    flag_modified(plan, "content")
     await db.commit()
     return {"status": "deleted"}
 
@@ -536,6 +565,7 @@ async def admin_add_task(
         task_payload["completed_at"] = datetime.now(timezone.utc).isoformat()
     tasks.append(task_payload)
     plan.content = jsonable_encoder(content)
+    flag_modified(plan, "content")
     await db.commit()
     await db.refresh(plan)
     return TaskItem(**task_payload)
@@ -566,6 +596,7 @@ async def admin_update_task(
     if task.get("status") == "completed" and not task.get("completed_at"):
         task["completed_at"] = datetime.now(timezone.utc).isoformat()
     plan.content = jsonable_encoder(content)
+    flag_modified(plan, "content")
     await db.commit()
     await db.refresh(plan)
     return TaskItem(**task)
@@ -586,5 +617,6 @@ async def admin_delete_task(
         raise HTTPException(status_code=404, detail="Задание не найдено")
     tasks.pop(index)
     plan.content = jsonable_encoder(content)
+    flag_modified(plan, "content")
     await db.commit()
     return {"status": "deleted"}

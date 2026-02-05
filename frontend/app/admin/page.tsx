@@ -129,6 +129,7 @@ export default function AdminPage() {
   const [selectedUserTests, setSelectedUserTests] = useState<UserTestResult[]>([]);
   const [selectedUserCases, setSelectedUserCases] = useState<CaseSolution[]>([]);
   const [newUserPassword, setNewUserPassword] = useState("");
+  const [userFullNameDraft, setUserFullNameDraft] = useState("");
 
   const [tests, setTests] = useState<Test[]>([]);
   const [selectedTestId, setSelectedTestId] = useState<number | null>(null);
@@ -164,6 +165,12 @@ export default function AdminPage() {
 
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!message) return;
+    const timeoutId = window.setTimeout(() => setMessage(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [message]);
 
   const isAdmin = user?.role === "admin";
 
@@ -275,6 +282,23 @@ export default function AdminPage() {
     () => users.find((u) => u.user.id === selectedUserId) ?? null,
     [users, selectedUserId]
   );
+
+  useEffect(() => {
+    setUserFullNameDraft(selectedUser?.user.full_name ?? "");
+  }, [selectedUser?.user.full_name, selectedUserId]);
+
+  const saveUserFullName = async () => {
+    if (!selectedUserId) return;
+    setMessage(null);
+    try {
+      await api.patch(`/admin/users/${selectedUserId}`, { full_name: userFullNameDraft });
+      setMessage("Имя пользователя обновлено");
+      await loadUsers();
+    } catch (e: any) {
+      console.error(e);
+      setMessage(e?.response?.data?.detail || "Ошибка обновления имени");
+    }
+  };
 
   const selectedTest = useMemo(
     () => tests.find((t) => t.id === selectedTestId) ?? null,
@@ -605,7 +629,9 @@ export default function AdminPage() {
                                 : "bg-white border-beige-300 hover:bg-beige-100"
                             }`}
                           >
-                            <div className="text-sm font-bold text-brown-800">{u.user.email}</div>
+                            <div className="text-sm font-bold text-brown-800">
+                              {(u.user.full_name && u.user.full_name.trim()) ? u.user.full_name : u.user.email}
+                            </div>
                             <div className="text-xs text-brown-600 mt-1">
                               role: {u.user.role} • analyses: {u.analysis_count} • tests: {u.test_results_count} • cases: {u.case_solutions_count}
                             </div>
@@ -622,6 +648,7 @@ export default function AdminPage() {
                         <div className="mt-4 space-y-3">
                           <div className="text-brown-800 text-sm">ID: <span className="font-bold">{selectedUser.user.id}</span></div>
                           <div className="text-brown-800 text-sm">Email: <span className="font-bold">{selectedUser.user.email}</span></div>
+                          <div className="text-brown-800 text-sm">Имя: <span className="font-bold">{selectedUser.user.full_name || "—"}</span></div>
                           <div className="text-brown-800 text-sm">Role: <span className="font-bold">{selectedUser.user.role}</span></div>
 
                           {selectedUserProfile ? (
@@ -635,6 +662,24 @@ export default function AdminPage() {
                           ) : (
                             <div className="text-brown-600 text-sm mt-3">Профиль не создан</div>
                           )}
+
+                          <div className="mt-6 bg-beige-100 border border-beige-300 rounded-xl p-5">
+                            <div className="text-sm font-bold text-brown-800">Изменить имя пользователя</div>
+                            <div className="mt-3 flex flex-col md:flex-row gap-3">
+                              <Input
+                                value={userFullNameDraft}
+                                onChange={(e) => setUserFullNameDraft(e.target.value)}
+                                placeholder="Имя (опц.)"
+                                className="bg-white border-beige-300"
+                              />
+                              <Button
+                                onClick={saveUserFullName}
+                                className="bg-accent-button hover:bg-accent-buttonHover text-white font-bold py-2 px-6 rounded-lg uppercase text-xs tracking-wider"
+                              >
+                                Сохранить
+                              </Button>
+                            </div>
+                          </div>
 
                           <div className="mt-6 bg-beige-100 border border-beige-300 rounded-xl p-5">
                             <div className="text-sm font-bold text-brown-800">Сменить пароль пользователя</div>

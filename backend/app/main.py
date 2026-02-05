@@ -177,15 +177,10 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
-from app.db.session import get_db
-from app.models.user import User
 
-router = APIRouter()
 
-@app.delete("/delete-test-users")
+
+@app.delete("/api/v1/delete-test-users")
 async def delete_test_users(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         delete(User).where(User.id.in_([6, 7]))

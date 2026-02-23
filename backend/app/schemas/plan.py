@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 
 
@@ -86,6 +86,34 @@ class PlanLibraryResponse(BaseModel):
     tasks: List[LibraryTaskItem]
 
 
+class MaterialProgressItem(BaseModel):
+    material_id: str
+    linked_test_id: Optional[int] = None
+    article_opened: bool = False
+    article_opened_at: Optional[datetime] = None
+    test_completed: bool = False
+    test_completed_at: Optional[datetime] = None
+    percentage: float = 0
+
+
+class BlockAchievementItem(BaseModel):
+    id: str
+    title: str
+    achieved_at: Optional[datetime] = None
+
+
+class FinalStageProgress(BaseModel):
+    final_test_id: Optional[int] = None
+    final_simulation_id: Optional[int] = None
+    unlocked: bool = False
+    final_test_completed: bool = False
+    final_simulation_completed: bool = False
+    completed: bool = False
+    level_up_applied: bool = False
+    completed_at: Optional[datetime] = None
+    achievement_title: Optional[str] = None
+
+
 class DevelopmentPlanWithProgress(BaseModel):
     """Schema for development plan with progress tracking"""
     id: int
@@ -94,6 +122,9 @@ class DevelopmentPlanWithProgress(BaseModel):
     is_archived: bool
     weaknesses: List[str]
     materials: List[MaterialItem]
+    material_progress: List[MaterialProgressItem] = []
     tasks: List[TaskItem]
     recommended_tests: List[TestRecommendation]
+    final_stage: Optional[FinalStageProgress] = None
+    block_achievements: List[BlockAchievementItem] = []
     progress: dict  # {"completed": int, "total": int, "percentage": float}

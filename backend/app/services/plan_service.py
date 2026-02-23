@@ -14,7 +14,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.profile import DevelopmentPlan, SoftSkillsProfile, ProfileHistory
 from app.models.analysis import AnalysisResult
-from app.models.content import Test
+from app.models.content import Test, Question, UserTestResult, CaseSolution
 from app.schemas.plan import DevelopmentPlanContent, MaterialItem, TaskItem, TestRecommendation
 from app.services.llm_service import LLMService
 from app.core.config import settings
@@ -27,6 +27,454 @@ class PlanService:
     
     def __init__(self):
         self.llm_service = LLMService()
+
+    def _skill_keywords(self) -> Dict[str, List[str]]:
+        return {
+            "communication": ["коммуник", "общен", "communication", "переговор", "диалог"],
+            "emotional_intelligence": ["эмоцион", "эмпат", "emotional", "intelligence", "ei"],
+            "critical_thinking": ["крит", "мышлен", "critical", "логик", "аргумент"],
+            "time_management": ["тайм", "времен", "time", "management", "дедлайн", "приоритет"],
+            "leadership": ["лидер", "leadership", "lead", "команд", "влияни"],
+        }
+
+    def _is_final_title(self, value: str) -> bool:
+        return "[final]" in str(value or "").strip().lower()
+
+    def _is_final_test(self, test: Test) -> bool:
+        title = str(getattr(test, "title", "") or "")
+        description = str(getattr(test, "description", "") or "")
+        return self._is_final_title(title) or self._is_final_title(description)
+
+    def _parse_iso_datetime(self, value: Any) -> Optional[datetime]:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        try:
+            parsed = datetime.fromisoformat(str(value))
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except Exception:
+            return None
+
+    def _material_progress_percentage(self, article_opened: bool, test_completed: bool) -> float:
+        score = 0
+        if article_opened:
+            score += 50
+        if test_completed:
+            score += 50
+        return float(score)
+
+    def _compute_components_progress(
+        self,
+        tasks: List[Dict[str, Any]],
+        materials: List[Dict[str, Any]],
+        material_progress: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, float]:
+        completed_tasks = sum(1 for task in tasks if str(task.get("status")).lower() == "completed")
+        opened_articles = 0
+        completed_material_tests = 0
+        for material in materials:
+            material_id = str(material.get("id", ""))
+            progress = material_progress.get(material_id, {})
+            if bool(progress.get("article_opened")):
+                opened_articles += 1
+            if bool(progress.get("test_completed")):
+                completed_material_tests += 1
+
+        completed = completed_tasks + opened_articles + completed_material_tests
+        total = len(tasks) + len(materials) * 2
+        percentage = (completed / total * 100.0) if total > 0 else 0.0
+        return {
+            "completed": completed,
+            "total": total,
+            "percentage": round(percentage, 2),
+        }
+
+    def _difficulty_ru_label(self, difficulty: str) -> str:
+        normalized = str(difficulty or "").strip().lower()
+        if normalized == "advanced":
+            return "продвинутый"
+        if normalized == "intermediate":
+            return "средний"
+        return "начальный"
+
+    def _build_block_achievement_title(self, content: Dict[str, Any]) -> str:
+        target = str(content.get("target_difficulty") or "beginner")
+        return f"Пройден первый {self._difficulty_ru_label(target)} блок"
+
+    def _assign_tests_to_materials(
+        self,
+        materials: List[Dict[str, Any]],
+        tests: List[Test],
+        existing_map: Dict[str, Any],
+    ) -> Dict[str, int]:
+        filtered_tests = [t for t in tests if str(t.type).lower() != "simulation" and not self._is_final_test(t)]
+        tests_by_id = {int(t.id): t for t in filtered_tests}
+        skill_keywords = self._skill_keywords()
+
+        tests_by_skill: Dict[str, List[int]] = {skill: [] for skill in skill_keywords.keys()}
+        fallback_ids: List[int] = []
+        for test in filtered_tests:
+            text = f"{test.title} {test.description}".lower()
+            fallback_ids.append(int(test.id))
+            matched_skill: Optional[str] = None
+            for skill, keywords in skill_keywords.items():
+                if any(keyword in text for keyword in keywords):
+                    matched_skill = skill
+                    break
+            if matched_skill:
+                tests_by_skill[matched_skill].append(int(test.id))
+
+        usage_cursor: Dict[str, int] = {skill: 0 for skill in skill_keywords.keys()}
+        mapping: Dict[str, int] = {}
+
+        for material in materials:
+            material_id = str(material.get("id", "")).strip()
+            if not material_id:
+                continue
+
+            current_value = existing_map.get(material_id)
+            try:
+                current_id = int(current_value) if current_value is not None else None
+            except Exception:
+                current_id = None
+            if current_id is not None and current_id in tests_by_id:
+                mapping[material_id] = current_id
+                continue
+
+            skill = str(material.get("skill", "")).strip().lower()
+            candidate_ids = tests_by_skill.get(skill) or []
+            selected_id: Optional[int] = None
+            if candidate_ids:
+                idx = usage_cursor.get(skill, 0) % len(candidate_ids)
+                selected_id = candidate_ids[idx]
+                usage_cursor[skill] = usage_cursor.get(skill, 0) + 1
+            elif fallback_ids:
+                selected_id = fallback_ids[0]
+
+            if selected_id is not None:
+                mapping[material_id] = selected_id
+
+        return mapping
+
+    def _next_level_floor_for_difficulty(self, difficulty: str) -> int:
+        normalized = str(difficulty or "").strip().lower()
+        if normalized == "advanced":
+            return 85
+        if normalized == "intermediate":
+            return 75
+        return 45
+
+    async def _ensure_final_stage_tests(
+        self,
+        content: Dict[str, Any],
+        db: AsyncSession,
+    ) -> Dict[str, Any]:
+        target_difficulty = str(content.get("target_difficulty") or "beginner")
+        final_stage = content.get("final_stage")
+        if not isinstance(final_stage, dict):
+            final_stage = {}
+
+        final_test_title = f"[FINAL] Итоговый тест ({target_difficulty})"
+        final_simulation_title = f"[FINAL] Итоговая ролевая игра ({target_difficulty})"
+
+        final_test = None
+        final_test_id_raw = final_stage.get("final_test_id")
+        try:
+            final_test_id = int(final_test_id_raw) if final_test_id_raw is not None else None
+        except Exception:
+            final_test_id = None
+        if final_test_id is not None:
+            test_res = await db.execute(select(Test).where(Test.id == final_test_id))
+            candidate = test_res.scalars().first()
+            if candidate and str(candidate.type).lower() != "simulation":
+                final_test = candidate
+
+        if final_test is None:
+            test_res = await db.execute(
+                select(Test).where(Test.title == final_test_title, Test.type == "quiz")
+            )
+            final_test = test_res.scalars().first()
+
+        if final_test is None:
+            final_test = Test(
+                title=final_test_title,
+                description="[FINAL] Комплексная проверка по всем зонам роста текущего блока.",
+                type="quiz",
+            )
+            db.add(final_test)
+            await db.flush()
+
+        questions_res = await db.execute(select(Question).where(Question.test_id == final_test.id))
+        existing_questions = list(questions_res.scalars().all())
+        if not existing_questions:
+            question_payload = [
+                "Опишите ситуацию, где вы применили коммуникацию и достигли результата.",
+                "Как вы управляете своими эмоциями в стрессовой рабочей ситуации?",
+                "Опишите пример, когда критическое мышление помогло избежать ошибки.",
+                "Как вы расставляете приоритеты при нескольких дедлайнах?",
+                "Как вы проявляете лидерство при работе в команде?",
+            ]
+            for text in question_payload:
+                db.add(
+                    Question(
+                        test_id=final_test.id,
+                        text=text,
+                        type="text",
+                        options=None,
+                        correct_answer=None,
+                    )
+                )
+
+        final_simulation = None
+        final_simulation_id_raw = final_stage.get("final_simulation_id")
+        try:
+            final_simulation_id = int(final_simulation_id_raw) if final_simulation_id_raw is not None else None
+        except Exception:
+            final_simulation_id = None
+        if final_simulation_id is not None:
+            simulation_res = await db.execute(select(Test).where(Test.id == final_simulation_id))
+            candidate = simulation_res.scalars().first()
+            if candidate and str(candidate.type).lower() == "simulation":
+                final_simulation = candidate
+
+        if final_simulation is None:
+            simulation_res = await db.execute(
+                select(Test).where(Test.title == final_simulation_title, Test.type == "simulation")
+            )
+            final_simulation = simulation_res.scalars().first()
+
+        if final_simulation is None:
+            final_simulation = Test(
+                title=final_simulation_title,
+                description="[FINAL] Большая ролевая игра: переговоры, конфликт, лидерство и тайм-менеджмент в одном сценарии.",
+                type="simulation",
+            )
+            db.add(final_simulation)
+            await db.flush()
+
+        final_stage["final_test_id"] = int(final_test.id)
+        final_stage["final_simulation_id"] = int(final_simulation.id)
+        return final_stage
+
+    async def _get_completion_test_ids(
+        self,
+        user_id: int,
+        test_ids: List[int],
+        db: AsyncSession,
+    ) -> set[int]:
+        unique_ids = sorted({int(test_id) for test_id in test_ids if int(test_id) > 0})
+        if not unique_ids:
+            return set()
+
+        completed_ids: set[int] = set()
+        results_res = await db.execute(
+            select(UserTestResult.test_id).where(
+                UserTestResult.user_id == user_id,
+                UserTestResult.test_id.in_(unique_ids),
+            )
+        )
+        for value in list(results_res.scalars().all()):
+            completed_ids.add(int(value))
+
+        cases_res = await db.execute(
+            select(CaseSolution.test_id).where(
+                CaseSolution.user_id == user_id,
+                CaseSolution.test_id.in_(unique_ids),
+            )
+        )
+        for value in list(cases_res.scalars().all()):
+            completed_ids.add(int(value))
+
+        return completed_ids
+
+    def _apply_final_level_up(
+        self,
+        profile: SoftSkillsProfile,
+        target_difficulty: str,
+    ) -> None:
+        floor = self._next_level_floor_for_difficulty(target_difficulty)
+        step = 8
+        profile.communication_score = min(100.0, max(float(profile.communication_score or 0.0) + step, float(floor)))
+        profile.emotional_intelligence_score = min(100.0, max(float(profile.emotional_intelligence_score or 0.0) + step, float(floor)))
+        profile.critical_thinking_score = min(100.0, max(float(profile.critical_thinking_score or 0.0) + step, float(floor)))
+        profile.time_management_score = min(100.0, max(float(profile.time_management_score or 0.0) + step, float(floor)))
+        profile.leadership_score = min(100.0, max(float(profile.leadership_score or 0.0) + step, float(floor)))
+
+    async def sync_plan_tracking(
+        self,
+        plan: DevelopmentPlan,
+        user_id: int,
+        db: AsyncSession,
+        profile: Optional[SoftSkillsProfile] = None,
+    ) -> Dict[str, Any]:
+        content = plan.content
+        if not isinstance(content, dict):
+            content = {}
+
+        materials = content.get("materials")
+        if not isinstance(materials, list):
+            materials = []
+        tasks = content.get("tasks")
+        if not isinstance(tasks, list):
+            tasks = []
+
+        changed = False
+
+        tests_res = await db.execute(select(Test).where(Test.type != "simulation").order_by(Test.id.asc()))
+        regular_tests = [t for t in list(tests_res.scalars().all()) if not self._is_final_test(t)]
+        raw_map = content.get("material_test_map")
+        material_test_map = raw_map if isinstance(raw_map, dict) else {}
+        computed_map = self._assign_tests_to_materials(materials, regular_tests, material_test_map)
+        if computed_map != material_test_map:
+            material_test_map = computed_map
+            content["material_test_map"] = material_test_map
+            changed = True
+
+        material_ids = [str(m.get("id", "")).strip() for m in materials if str(m.get("id", "")).strip()]
+        raw_material_progress = content.get("material_progress")
+        material_progress = raw_material_progress if isinstance(raw_material_progress, dict) else {}
+
+        mapped_test_ids: List[int] = []
+        for material_id in material_ids:
+            value = material_test_map.get(material_id)
+            try:
+                test_id = int(value) if value is not None else None
+            except Exception:
+                test_id = None
+            if test_id is not None and test_id > 0:
+                mapped_test_ids.append(test_id)
+
+        completed_test_ids = await self._get_completion_test_ids(user_id, mapped_test_ids, db)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        normalized_material_progress: Dict[str, Dict[str, Any]] = {}
+        for material_id in material_ids:
+            entry = material_progress.get(material_id) if isinstance(material_progress.get(material_id), dict) else {}
+            article_opened = bool(entry.get("article_opened"))
+            article_opened_at = entry.get("article_opened_at")
+            linked_test_id_raw = material_test_map.get(material_id)
+            try:
+                linked_test_id = int(linked_test_id_raw) if linked_test_id_raw is not None else None
+            except Exception:
+                linked_test_id = None
+
+            test_completed = linked_test_id in completed_test_ids if linked_test_id is not None else False
+            test_completed_at = entry.get("test_completed_at")
+            if test_completed and not test_completed_at:
+                test_completed_at = now_iso
+            if not test_completed:
+                test_completed_at = None
+
+            normalized_material_progress[material_id] = {
+                "linked_test_id": linked_test_id,
+                "article_opened": article_opened,
+                "article_opened_at": article_opened_at,
+                "test_completed": test_completed,
+                "test_completed_at": test_completed_at,
+                "percentage": self._material_progress_percentage(article_opened, test_completed),
+            }
+
+        if normalized_material_progress != material_progress:
+            material_progress = normalized_material_progress
+            content["material_progress"] = material_progress
+            changed = True
+
+        progress = self._compute_components_progress(tasks, materials, material_progress)
+
+        previous_final_stage = content.get("final_stage")
+        if not isinstance(previous_final_stage, dict):
+            previous_final_stage = {}
+        previous_final_stage_snapshot = jsonable_encoder(previous_final_stage)
+
+        final_stage = await self._ensure_final_stage_tests(content, db)
+        final_test_id = final_stage.get("final_test_id")
+        final_simulation_id = final_stage.get("final_simulation_id")
+        completion_ids: List[int] = []
+        try:
+            if final_test_id is not None:
+                completion_ids.append(int(final_test_id))
+        except Exception:
+            pass
+        try:
+            if final_simulation_id is not None:
+                completion_ids.append(int(final_simulation_id))
+        except Exception:
+            pass
+        completion_set = await self._get_completion_test_ids(user_id, completion_ids, db)
+
+        final_test_completed = int(final_test_id) in completion_set if final_test_id is not None else False
+        final_simulation_completed = int(final_simulation_id) in completion_set if final_simulation_id is not None else False
+
+        final_stage["unlocked"] = bool(progress.get("percentage", 0) >= 100)
+        final_stage["final_test_completed"] = final_test_completed
+        final_stage["final_simulation_completed"] = final_simulation_completed
+        final_stage["completed"] = bool(final_test_completed and final_simulation_completed)
+        final_stage.setdefault("level_up_applied", False)
+        final_stage["achievement_title"] = self._build_block_achievement_title(content)
+
+        achievements = content.get("block_achievements")
+        if not isinstance(achievements, list):
+            achievements = []
+
+        if final_stage["completed"] and not bool(final_stage.get("level_up_applied")):
+            if profile is None:
+                profile_res = await db.execute(select(SoftSkillsProfile).where(SoftSkillsProfile.user_id == user_id))
+                profile = profile_res.scalar_one_or_none()
+
+            if profile is not None:
+                self._apply_final_level_up(profile, str(content.get("target_difficulty") or "beginner"))
+                db.add(
+                    ProfileHistory(
+                        user_id=user_id,
+                        profile_id=profile.id,
+                        communication_score=float(profile.communication_score or 0.0),
+                        emotional_intelligence_score=float(profile.emotional_intelligence_score or 0.0),
+                        critical_thinking_score=float(profile.critical_thinking_score or 0.0),
+                        time_management_score=float(profile.time_management_score or 0.0),
+                        leadership_score=float(profile.leadership_score or 0.0),
+                    )
+                )
+
+            final_stage["level_up_applied"] = True
+            final_stage["completed_at"] = now_iso
+            achievement_id = f"block_{plan.id}_{str(content.get('target_difficulty') or 'beginner')}"
+            if not any(str(item.get("id")) == achievement_id for item in achievements if isinstance(item, dict)):
+                achievements.append(
+                    {
+                        "id": achievement_id,
+                        "title": final_stage["achievement_title"],
+                        "achieved_at": now_iso,
+                    }
+                )
+            changed = True
+
+        if final_stage != previous_final_stage_snapshot:
+            changed = True
+
+        previous_achievements = content.get("block_achievements")
+        if not isinstance(previous_achievements, list):
+            previous_achievements = []
+        if achievements != previous_achievements:
+            changed = True
+
+        content["final_stage"] = final_stage
+        content["block_achievements"] = achievements
+
+        if changed:
+            plan.content = jsonable_encoder(content)
+            flag_modified(plan, "content")
+            await db.commit()
+            await db.refresh(plan)
+
+        return {
+            "material_progress": material_progress,
+            "progress": progress,
+            "final_stage": final_stage,
+            "block_achievements": achievements,
+        }
 
     def _curated_material_library(self) -> List[Dict[str, str]]:
         return [
@@ -609,6 +1057,61 @@ class PlanService:
         await db.refresh(plan)
         
         return plan
+
+    async def mark_material_article_open(
+        self,
+        user_id: int,
+        plan_id: int,
+        material_id: str,
+        db: AsyncSession,
+    ) -> DevelopmentPlan:
+        result = await db.execute(
+            select(DevelopmentPlan)
+            .where(
+                and_(
+                    DevelopmentPlan.id == plan_id,
+                    DevelopmentPlan.user_id == user_id,
+                    DevelopmentPlan.is_archived == False,
+                )
+            )
+        )
+        plan = result.scalar_one_or_none()
+        if plan is None:
+            raise ValueError(f"Active plan {plan_id} not found for user {user_id}")
+
+        content = plan.content
+        if not isinstance(content, dict):
+            content = {}
+
+        materials = content.get("materials")
+        if not isinstance(materials, list):
+            materials = []
+            content["materials"] = materials
+
+        if not any(str(material.get("id")) == str(material_id) for material in materials if isinstance(material, dict)):
+            raise ValueError(f"Material {material_id} not found in plan {plan_id}")
+
+        material_progress = content.get("material_progress")
+        if not isinstance(material_progress, dict):
+            material_progress = {}
+            content["material_progress"] = material_progress
+
+        entry = material_progress.get(str(material_id))
+        if not isinstance(entry, dict):
+            entry = {}
+        entry["article_opened"] = True
+        entry.setdefault("article_opened_at", datetime.now(timezone.utc).isoformat())
+        entry["percentage"] = self._material_progress_percentage(
+            bool(entry.get("article_opened")),
+            bool(entry.get("test_completed")),
+        )
+        material_progress[str(material_id)] = entry
+
+        plan.content = jsonable_encoder(content)
+        flag_modified(plan, "content")
+        await db.commit()
+        await db.refresh(plan)
+        return plan
     
     async def get_active_plan(
         self,
@@ -877,7 +1380,7 @@ class PlanService:
 
     async def _select_recommended_tests(self, weaknesses: List[str], target_difficulty: str, db: AsyncSession) -> List[TestRecommendation]:
         query = await db.execute(select(Test).where(Test.type != "simulation").order_by(Test.id.asc()))
-        tests = list(query.scalars().all())
+        tests = [t for t in list(query.scalars().all()) if not self._is_final_test(t)]
         if not tests:
             return []
 
@@ -886,13 +1389,7 @@ class PlanService:
         others = [t for t in tests if t not in preferred]
         tests = preferred + others
 
-        skill_keywords = {
-            "communication": ["коммуник", "communication"],
-            "emotional_intelligence": ["эмоцион", "emotional", "intelligence"],
-            "critical_thinking": ["крит", "critical", "мышлен"],
-            "time_management": ["тайм", "time", "management"],
-            "leadership": ["лидер", "leadership", "lead"],
-        }
+        skill_keywords = self._skill_keywords()
 
         def _resolve_keywords(weakness: str) -> List[str]:
             if not weakness:
@@ -1032,3 +1529,4 @@ class PlanService:
 
 # Create a singleton instance
 plan_service = PlanService()
+

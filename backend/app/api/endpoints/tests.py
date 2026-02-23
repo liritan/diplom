@@ -1,4 +1,4 @@
-import json
+﻿import json
 from typing import Any, List
 from datetime import datetime, timedelta, timezone
 
@@ -114,7 +114,7 @@ async def submit_test(
                     "result_id": existing.id,
                     "task_id": existing_task.id,
                     "status": existing_task.status,
-                    "message": "Этот тест уже был отправлен на анализ. Возвращаю существующий результат.",
+                    "message": "Р­С‚РѕС‚ С‚РµСЃС‚ СѓР¶Рµ Р±С‹Р» РѕС‚РїСЂР°РІР»РµРЅ РЅР° Р°РЅР°Р»РёР·. Р’РѕР·РІСЂР°С‰Р°СЋ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ СЂРµР·СѓР»СЊС‚Р°С‚.",
                 }
 
         # 1. Save Raw Result
@@ -143,12 +143,12 @@ async def submit_test(
             "result_id": db_result.id,
             "task_id": analysis_task.id,
             "status": "pending",
-            "message": "Тест отправлен на анализ. Результаты будут доступны через несколько секунд."
+            "message": "РўРµСЃС‚ РѕС‚РїСЂР°РІР»РµРЅ РЅР° Р°РЅР°Р»РёР·. Р РµР·СѓР»СЊС‚Р°С‚С‹ Р±СѓРґСѓС‚ РґРѕСЃС‚СѓРїРЅС‹ С‡РµСЂРµР· РЅРµСЃРєРѕР»СЊРєРѕ СЃРµРєСѓРЅРґ."
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при отправке теста: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїСЂРё РѕС‚РїСЂР°РІРєРµ С‚РµСЃС‚Р°: {str(e)}")
 
 
 @router.get("/me/results", response_model=List[UserTestResultSchema])
@@ -271,9 +271,11 @@ async def submit_simulation(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     scenario_map = {
-        "interview": "Собеседование",
-        "conflict": "Конфликт в команде",
-        "negotiation": "Переговоры",
+        "interview": "РЎРѕР±РµСЃРµРґРѕРІР°РЅРёРµ",
+        "conflict": "РљРѕРЅС„Р»РёРєС‚ РІ РєРѕРјР°РЅРґРµ",
+        "negotiation": "РџРµСЂРµРіРѕРІРѕСЂС‹",
+        "time-management": "Тайм-менеджмент",
+        "leadership": "Лидерство",
     }
     title = scenario_map.get(scenario)
     if not title:
@@ -353,9 +355,11 @@ async def simulation_reply(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     scenario_map = {
-        "interview": "Собеседование",
-        "conflict": "Конфликт в команде",
-        "negotiation": "Переговоры",
+        "interview": "РЎРѕР±РµСЃРµРґРѕРІР°РЅРёРµ",
+        "conflict": "РљРѕРЅС„Р»РёРєС‚ РІ РєРѕРјР°РЅРґРµ",
+        "negotiation": "РџРµСЂРµРіРѕРІРѕСЂС‹",
+        "time-management": "Тайм-менеджмент",
+        "leadership": "Лидерство",
     }
     title = scenario_map.get(scenario)
     if not title:
@@ -363,17 +367,17 @@ async def simulation_reply(
 
     transcript_lines = []
     for m in payload.messages:
-        speaker = "Пользователь" if m.role == "user" else "Собеседник"
+        speaker = "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ" if m.role == "user" else "РЎРѕР±РµСЃРµРґРЅРёРє"
         transcript_lines.append(f"{speaker}: {m.text}")
 
     transcript = "\n".join(transcript_lines)
     prompt = (
-        f"Ты участвуешь в симуляции '{title}'. "
-        "Ты играешь роль собеседника (вторая сторона). "
-        "Пользователь пишет только свои реплики. "
-        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
-        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
-        f"Диалог:\n{transcript}\n\nСобеседник:"
+        f"РўС‹ СѓС‡Р°СЃС‚РІСѓРµС€СЊ РІ СЃРёРјСѓР»СЏС†РёРё '{title}'. "
+        "РўС‹ РёРіСЂР°РµС€СЊ СЂРѕР»СЊ СЃРѕР±РµСЃРµРґРЅРёРєР° (РІС‚РѕСЂР°СЏ СЃС‚РѕСЂРѕРЅР°). "
+        "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РїРёС€РµС‚ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЂРµРїР»РёРєРё. "
+        "РўРІРѕСЏ Р·Р°РґР°С‡Р° вЂ” РѕС‚РІРµС‚РёС‚СЊ РѕРґРЅРѕР№ СЂРµРїР»РёРєРѕР№ СЃРѕР±РµСЃРµРґРЅРёРєР° РЅР° СЂСѓСЃСЃРєРѕРј (1-3 РїСЂРµРґР»РѕР¶РµРЅРёСЏ). "
+        "РќРµ РѕРїРёСЃС‹РІР°Р№ РґРµР№СЃС‚РІРёСЏ, РЅРµ РґРѕР±Р°РІР»СЏР№ РїСЂРµС„РёРєСЃС‹ РІСЂРѕРґРµ 'РРЅС‚РµСЂРІСЊСЋРµСЂ:' вЂ” РІРµСЂРЅРё С‚РѕР»СЊРєРѕ С‚РµРєСЃС‚ СЂРµРїР»РёРєРё.\n\n"
+        f"Р”РёР°Р»РѕРі:\n{transcript}\n\nРЎРѕР±РµСЃРµРґРЅРёРє:"
     )
 
     reply = await yandex_service.get_chat_response(prompt)
@@ -389,9 +393,11 @@ async def simulation_voice_message(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     scenario_map = {
-        "interview": "Собеседование",
-        "conflict": "Конфликт в команде",
-        "negotiation": "Переговоры",
+        "interview": "РЎРѕР±РµСЃРµРґРѕРІР°РЅРёРµ",
+        "conflict": "РљРѕРЅС„Р»РёРєС‚ РІ РєРѕРјР°РЅРґРµ",
+        "negotiation": "РџРµСЂРµРіРѕРІРѕСЂС‹",
+        "time-management": "Тайм-менеджмент",
+        "leadership": "Лидерство",
     }
     title = scenario_map.get(scenario)
     if not title:
@@ -401,7 +407,7 @@ async def simulation_voice_message(
     user_text = await yandex_service.speech_to_text(audio_content)
     if not user_text:
         return {
-            "response": "Извините, я не смог распознать ваше сообщение.",
+            "response": "РР·РІРёРЅРёС‚Рµ, СЏ РЅРµ СЃРјРѕРі СЂР°СЃРїРѕР·РЅР°С‚СЊ РІР°С€Рµ СЃРѕРѕР±С‰РµРЅРёРµ.",
             "user_text": "",
             "status": "failed",
         }
@@ -421,19 +427,19 @@ async def simulation_voice_message(
         text = m.get("text")
         if not role or not text:
             continue
-        speaker = "Пользователь" if role == "user" else "Собеседник"
+        speaker = "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ" if role == "user" else "РЎРѕР±РµСЃРµРґРЅРёРє"
         transcript_lines.append(f"{speaker}: {text}")
 
-    transcript_lines.append(f"Пользователь: {user_text}")
+    transcript_lines.append(f"РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: {user_text}")
     transcript = "\n".join(transcript_lines)
 
     prompt = (
-        f"Ты участвуешь в симуляции '{title}'. "
-        "Ты играешь роль собеседника (вторая сторона). "
-        "Пользователь пишет только свои реплики. "
-        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
-        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
-        f"Диалог:\n{transcript}\n\nСобеседник:"
+        f"РўС‹ СѓС‡Р°СЃС‚РІСѓРµС€СЊ РІ СЃРёРјСѓР»СЏС†РёРё '{title}'. "
+        "РўС‹ РёРіСЂР°РµС€СЊ СЂРѕР»СЊ СЃРѕР±РµСЃРµРґРЅРёРєР° (РІС‚РѕСЂР°СЏ СЃС‚РѕСЂРѕРЅР°). "
+        "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РїРёС€РµС‚ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЂРµРїР»РёРєРё. "
+        "РўРІРѕСЏ Р·Р°РґР°С‡Р° вЂ” РѕС‚РІРµС‚РёС‚СЊ РѕРґРЅРѕР№ СЂРµРїР»РёРєРѕР№ СЃРѕР±РµСЃРµРґРЅРёРєР° РЅР° СЂСѓСЃСЃРєРѕРј (1-3 РїСЂРµРґР»РѕР¶РµРЅРёСЏ). "
+        "РќРµ РѕРїРёСЃС‹РІР°Р№ РґРµР№СЃС‚РІРёСЏ, РЅРµ РґРѕР±Р°РІР»СЏР№ РїСЂРµС„РёРєСЃС‹ РІСЂРѕРґРµ 'РРЅС‚РµСЂРІСЊСЋРµСЂ:' вЂ” РІРµСЂРЅРё С‚РѕР»СЊРєРѕ С‚РµРєСЃС‚ СЂРµРїР»РёРєРё.\n\n"
+        f"Р”РёР°Р»РѕРі:\n{transcript}\n\nРЎРѕР±РµСЃРµРґРЅРёРє:"
     )
 
     reply = await yandex_service.get_chat_response(prompt)
@@ -459,17 +465,17 @@ async def simulation_reply_by_test(
 
     transcript_lines = []
     for m in payload.messages:
-        speaker = "Пользователь" if m.role == "user" else "Собеседник"
+        speaker = "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ" if m.role == "user" else "РЎРѕР±РµСЃРµРґРЅРёРє"
         transcript_lines.append(f"{speaker}: {m.text}")
 
     transcript = "\n".join(transcript_lines)
     prompt = (
-        f"Ты участвуешь в симуляции '{test.title}'. "
-        "Ты играешь роль собеседника (вторая сторона). "
-        "Пользователь пишет только свои реплики. "
-        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
-        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
-        f"Диалог:\n{transcript}\n\nСобеседник:"
+        f"РўС‹ СѓС‡Р°СЃС‚РІСѓРµС€СЊ РІ СЃРёРјСѓР»СЏС†РёРё '{test.title}'. "
+        "РўС‹ РёРіСЂР°РµС€СЊ СЂРѕР»СЊ СЃРѕР±РµСЃРµРґРЅРёРєР° (РІС‚РѕСЂР°СЏ СЃС‚РѕСЂРѕРЅР°). "
+        "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РїРёС€РµС‚ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЂРµРїР»РёРєРё. "
+        "РўРІРѕСЏ Р·Р°РґР°С‡Р° вЂ” РѕС‚РІРµС‚РёС‚СЊ РѕРґРЅРѕР№ СЂРµРїР»РёРєРѕР№ СЃРѕР±РµСЃРµРґРЅРёРєР° РЅР° СЂСѓСЃСЃРєРѕРј (1-3 РїСЂРµРґР»РѕР¶РµРЅРёСЏ). "
+        "РќРµ РѕРїРёСЃС‹РІР°Р№ РґРµР№СЃС‚РІРёСЏ, РЅРµ РґРѕР±Р°РІР»СЏР№ РїСЂРµС„РёРєСЃС‹ РІСЂРѕРґРµ 'РРЅС‚РµСЂРІСЊСЋРµСЂ:' вЂ” РІРµСЂРЅРё С‚РѕР»СЊРєРѕ С‚РµРєСЃС‚ СЂРµРїР»РёРєРё.\n\n"
+        f"Р”РёР°Р»РѕРі:\n{transcript}\n\nРЎРѕР±РµСЃРµРґРЅРёРє:"
     )
 
     reply = await yandex_service.get_chat_response(prompt)
@@ -494,7 +500,7 @@ async def simulation_voice_message_by_test(
     user_text = await yandex_service.speech_to_text(audio_content)
     if not user_text:
         return {
-            "response": "Извините, я не смог распознать ваше сообщение.",
+            "response": "РР·РІРёРЅРёС‚Рµ, СЏ РЅРµ СЃРјРѕРі СЂР°СЃРїРѕР·РЅР°С‚СЊ РІР°С€Рµ СЃРѕРѕР±С‰РµРЅРёРµ.",
             "user_text": "",
             "status": "failed",
         }
@@ -514,19 +520,19 @@ async def simulation_voice_message_by_test(
         text = m.get("text")
         if not role or not text:
             continue
-        speaker = "Пользователь" if role == "user" else "Собеседник"
+        speaker = "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ" if role == "user" else "РЎРѕР±РµСЃРµРґРЅРёРє"
         transcript_lines.append(f"{speaker}: {text}")
 
-    transcript_lines.append(f"Пользователь: {user_text}")
+    transcript_lines.append(f"РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: {user_text}")
     transcript = "\n".join(transcript_lines)
 
     prompt = (
-        f"Ты участвуешь в симуляции '{test.title}'. "
-        "Ты играешь роль собеседника (вторая сторона). "
-        "Пользователь пишет только свои реплики. "
-        "Твоя задача — ответить одной репликой собеседника на русском (1-3 предложения). "
-        "Не описывай действия, не добавляй префиксы вроде 'Интервьюер:' — верни только текст реплики.\n\n"
-        f"Диалог:\n{transcript}\n\nСобеседник:"
+        f"РўС‹ СѓС‡Р°СЃС‚РІСѓРµС€СЊ РІ СЃРёРјСѓР»СЏС†РёРё '{test.title}'. "
+        "РўС‹ РёРіСЂР°РµС€СЊ СЂРѕР»СЊ СЃРѕР±РµСЃРµРґРЅРёРєР° (РІС‚РѕСЂР°СЏ СЃС‚РѕСЂРѕРЅР°). "
+        "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РїРёС€РµС‚ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЂРµРїР»РёРєРё. "
+        "РўРІРѕСЏ Р·Р°РґР°С‡Р° вЂ” РѕС‚РІРµС‚РёС‚СЊ РѕРґРЅРѕР№ СЂРµРїР»РёРєРѕР№ СЃРѕР±РµСЃРµРґРЅРёРєР° РЅР° СЂСѓСЃСЃРєРѕРј (1-3 РїСЂРµРґР»РѕР¶РµРЅРёСЏ). "
+        "РќРµ РѕРїРёСЃС‹РІР°Р№ РґРµР№СЃС‚РІРёСЏ, РЅРµ РґРѕР±Р°РІР»СЏР№ РїСЂРµС„РёРєСЃС‹ РІСЂРѕРґРµ 'РРЅС‚РµСЂРІСЊСЋРµСЂ:' вЂ” РІРµСЂРЅРё С‚РѕР»СЊРєРѕ С‚РµРєСЃС‚ СЂРµРїР»РёРєРё.\n\n"
+        f"Р”РёР°Р»РѕРі:\n{transcript}\n\nРЎРѕР±РµСЃРµРґРЅРёРє:"
     )
 
     reply = await yandex_service.get_chat_response(prompt)
@@ -620,3 +626,5 @@ async def read_test(
     if not test:
         raise HTTPException(status_code=404, detail="Test not found")
     return test
+
+

@@ -20,6 +20,12 @@ function typeLabel(t: string) {
   return "Тест";
 }
 
+function isFinalItem(test: Test) {
+  const title = String(test.title || "").toLowerCase();
+  const description = String(test.description || "").toLowerCase();
+  return title.includes("[final]") || description.includes("[final]");
+}
+
 export default function TestsPage() {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +44,10 @@ export default function TestsPage() {
     run();
   }, []);
 
-  const list = useMemo(() => tests.filter((t) => t.type !== "simulation"), [tests]);
+  const list = useMemo(
+    () => tests.filter((t) => t.type !== "simulation" && !isFinalItem(t)),
+    [tests]
+  );
 
   return (
     <AppLayout>

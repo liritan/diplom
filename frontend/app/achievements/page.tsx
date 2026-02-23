@@ -8,6 +8,10 @@ import { Card } from "@/components/ui/common";
 type AnalysisResult = { id: number };
 type UserTestResult = { id: number };
 type CaseSolution = { id: number };
+type ActivePlan = {
+  final_stage?: { level_up_applied?: boolean; achievement_title?: string | null } | null;
+  block_achievements?: Array<{ title?: string | null }> | null;
+} | null;
 
 type Achievement = {
   id: string;
@@ -20,19 +24,30 @@ export default function AchievementsPage() {
   const [analysisCount, setAnalysisCount] = useState(0);
   const [testsCount, setTestsCount] = useState(0);
   const [casesCount, setCasesCount] = useState(0);
+  const [blockAchievementTitle, setBlockAchievementTitle] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const run = async () => {
       try {
-        const [a, t, c] = await Promise.all([
+        const [a, t, c, p] = await Promise.all([
           api.get<AnalysisResult[]>("/analysis/me/results", { params: { limit: 1000 } }),
           api.get<UserTestResult[]>("/tests/me/results", { params: { limit: 1000 } }),
           api.get<CaseSolution[]>("/tests/me/case-solutions", { params: { limit: 1000 } }),
+          api.get<ActivePlan>("/plans/me/active"),
         ]);
         setAnalysisCount(a.data.length);
         setTestsCount(t.data.length);
         setCasesCount(c.data.length);
+        const plan = p.data;
+        const fromList =
+          Array.isArray(plan?.block_achievements) && plan?.block_achievements.length
+            ? String(plan?.block_achievements[0]?.title || "").trim()
+            : "";
+        const fromFinal = String(plan?.final_stage?.achievement_title || "").trim();
+        const title = fromList || fromFinal;
+        const isDone = Boolean(plan?.final_stage?.level_up_applied) || Boolean(title);
+        setBlockAchievementTitle(isDone ? (title || "Пройден первый начальный блок") : null);
       } catch (e) {
         console.error(e);
       } finally {
@@ -76,6 +91,13 @@ export default function AchievementsPage() {
       },
     ];
 
+    base.push({
+      id: "block_stage_1",
+      title: blockAchievementTitle || "Пройден первый начальный блок",
+      description: "Завершите план по материалам/заданиям и пройдите оба финальных задания",
+      done: Boolean(blockAchievementTitle),
+    });
+
     const baseDone = base.every((a) => a.done);
     if (!baseDone) return base;
 
@@ -112,7 +134,7 @@ export default function AchievementsPage() {
         done: analysisCount + testsCount + casesCount >= 50,
       },
     ];
-  }, [analysisCount, testsCount, casesCount]);
+  }, [analysisCount, testsCount, casesCount, blockAchievementTitle]);
 
   return (
     <AppLayout>

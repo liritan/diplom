@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,29 +8,31 @@ import { MessageSquare, BarChart2, PieChart, FileText, BookOpen, Award, History,
 
 const menuItems = [
   {
-    category: "ОСНОВНОЕ",
+    category: "РћРЎРќРћР’РќРћР•",
     items: [
-      { name: "Основной чат", icon: MessageSquare, href: "/chat" },
-      { name: "Анализ навыков", icon: PieChart, href: "/analysis" },
-      { name: "Статистика", icon: BarChart2, href: "/dashboard" },
+      { name: "РћСЃРЅРѕРІРЅРѕР№ С‡Р°С‚", icon: MessageSquare, href: "/chat" },
+      { name: "РђРЅР°Р»РёР· РЅР°РІС‹РєРѕРІ", icon: PieChart, href: "/analysis" },
+      { name: "РЎС‚Р°С‚РёСЃС‚РёРєР°", icon: BarChart2, href: "/dashboard" },
     ],
   },
   {
-    category: "ТРЕНИНГИ И ТЕСТЫ",
+    category: "РўР Р•РќРРќР“Р Р РўР•РЎРўР«",
     items: [
-      { name: "Тесты", icon: FileText, href: "/tests" },
-      { name: "Материалы", icon: BookOpen, href: "/materials" },
-      { name: "Достижения", icon: Award, href: "/achievements" },
-      { name: "История", icon: History, href: "/history" },
+      { name: "РўРµСЃС‚С‹", icon: FileText, href: "/tests" },
+      { name: "РњР°С‚РµСЂРёР°Р»С‹", icon: BookOpen, href: "/materials" },
+      { name: "Р”РѕСЃС‚РёР¶РµРЅРёСЏ", icon: Award, href: "/achievements" },
+      { name: "РСЃС‚РѕСЂРёСЏ", icon: History, href: "/history" },
     ],
   },
   {
-    category: "РОЛЕВЫЕ ИГРЫ",
+    category: "Р РћР›Р•Р’Р«Р• РР“Р Р«",
     items: [
-      { name: "Все ролевые игры", icon: Users, href: "/simulation" },
-      { name: "Собеседование", icon: Users, href: "/simulation/interview" },
-      { name: "Конфликт в команде", icon: MessageCircle, href: "/simulation/conflict" },
-      { name: "Переговоры", icon: Mic, href: "/simulation/negotiation" },
+      { name: "Р’СЃРµ СЂРѕР»РµРІС‹Рµ РёРіСЂС‹", icon: Users, href: "/simulation" },
+      { name: "РЎРѕР±РµСЃРµРґРѕРІР°РЅРёРµ", icon: Users, href: "/simulation/interview" },
+      { name: "РљРѕРЅС„Р»РёРєС‚ РІ РєРѕРјР°РЅРґРµ", icon: MessageCircle, href: "/simulation/conflict" },
+      { name: "РџРµСЂРµРіРѕРІРѕСЂС‹", icon: Mic, href: "/simulation/negotiation" },
+      { name: "Тайм-менеджмент", icon: Mic, href: "/simulation/time-management" },
+      { name: "Лидерство", icon: Users, href: "/simulation/leadership" },
     ],
   },
 ];
@@ -43,9 +45,9 @@ export function Sidebar() {
     ? [
         ...menuItems,
         {
-          category: "АДМИН",
+          category: "РђР”РњРРќ",
           items: [
-            { name: "Админ-панель", icon: Users, href: "/admin" },
+            { name: "РђРґРјРёРЅ-РїР°РЅРµР»СЊ", icon: Users, href: "/admin" },
           ],
         },
       ]
@@ -54,7 +56,7 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-beige-200 h-screen flex flex-col border-r border-beige-300">
       <div className="h-16 flex items-center px-6 bg-accent-gold text-white font-bold text-xl tracking-wide shadow-sm">
-        AI Тренер
+        AI РўСЂРµРЅРµСЂ
       </div>
       
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
@@ -90,3 +92,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

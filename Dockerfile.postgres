@@ -1,0 +1,13 @@
+FROM ankane/pgvector
+
+# Настройки окружения
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=password
+ENV POSTGRES_DB=softskills_db
+
+# Порт
+EXPOSE 5432
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD pg_isready -U postgres

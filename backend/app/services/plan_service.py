@@ -264,27 +264,37 @@ class PlanService:
         user_id: int,
         test_ids: List[int],
         db: AsyncSession,
+        completed_after: Optional[datetime] = None,
     ) -> set[int]:
         unique_ids = sorted({int(test_id) for test_id in test_ids if int(test_id) > 0})
         if not unique_ids:
             return set()
 
+        completed_after_utc: Optional[datetime] = None
+        if completed_after is not None:
+            if completed_after.tzinfo is None:
+                completed_after_utc = completed_after.replace(tzinfo=timezone.utc)
+            else:
+                completed_after_utc = completed_after
+
         completed_ids: set[int] = set()
-        results_res = await db.execute(
-            select(UserTestResult.test_id).where(
-                UserTestResult.user_id == user_id,
-                UserTestResult.test_id.in_(unique_ids),
-            )
+        results_query = select(UserTestResult.test_id).where(
+            UserTestResult.user_id == user_id,
+            UserTestResult.test_id.in_(unique_ids),
         )
+        if completed_after_utc is not None:
+            results_query = results_query.where(UserTestResult.completed_at >= completed_after_utc)
+        results_res = await db.execute(results_query)
         for value in list(results_res.scalars().all()):
             completed_ids.add(int(value))
 
-        cases_res = await db.execute(
-            select(CaseSolution.test_id).where(
-                CaseSolution.user_id == user_id,
-                CaseSolution.test_id.in_(unique_ids),
-            )
+        cases_query = select(CaseSolution.test_id).where(
+            CaseSolution.user_id == user_id,
+            CaseSolution.test_id.in_(unique_ids),
         )
+        if completed_after_utc is not None:
+            cases_query = cases_query.where(CaseSolution.created_at >= completed_after_utc)
+        cases_res = await db.execute(cases_query)
         for value in list(cases_res.scalars().all()):
             completed_ids.add(int(value))
 
@@ -347,7 +357,12 @@ class PlanService:
             if test_id is not None and test_id > 0:
                 mapped_test_ids.append(test_id)
 
-        completed_test_ids = await self._get_completion_test_ids(user_id, mapped_test_ids, db)
+        completed_test_ids = await self._get_completion_test_ids(
+            user_id,
+            mapped_test_ids,
+            db,
+            completed_after=plan.generated_at,
+        )
         now_iso = datetime.now(timezone.utc).isoformat()
 
         normalized_material_progress: Dict[str, Dict[str, Any]] = {}
@@ -403,7 +418,12 @@ class PlanService:
                 completion_ids.append(int(final_simulation_id))
         except Exception:
             pass
-        completion_set = await self._get_completion_test_ids(user_id, completion_ids, db)
+        completion_set = await self._get_completion_test_ids(
+            user_id,
+            completion_ids,
+            db,
+            completed_after=plan.generated_at,
+        )
 
         final_test_completed = int(final_test_id) in completion_set if final_test_id is not None else False
         final_simulation_completed = int(final_simulation_id) in completion_set if final_simulation_id is not None else False
@@ -1170,66 +1190,35 @@ class PlanService:
         Property 10: Plan Regeneration on Progress
         Property 11: Skill Improvement Detection
         """
-        # Check task completion percentage (Requirement 4.2)
+        _ = db
         content = plan.content
-        if not content or "tasks" not in content:
+        if not isinstance(content, dict):
+            return False
+
+        final_stage = content.get("final_stage")
+        if not isinstance(final_stage, dict):
+            final_stage = {}
+
+        # Prevent plan switching while user is still finishing the current block.
+        if not bool(final_stage.get("level_up_applied")):
             return False
 
         current_target_difficulty = self._resolve_target_difficulty(profile)
         plan_target_difficulty = self._infer_plan_difficulty(content)
         if plan_target_difficulty and plan_target_difficulty != current_target_difficulty:
             logger.info(
-                "Plan %s difficulty '%s' differs from current '%s'. Triggering regeneration.",
+                "Plan %s difficulty '%s' differs from current '%s' after block completion. Triggering regeneration.",
                 plan.id,
                 plan_target_difficulty,
                 current_target_difficulty,
             )
             return True
-        
-        tasks = content["tasks"]
-        if not tasks:
-            return False
-        
-        completed_tasks = sum(1 for task in tasks if task.get("status") == "completed")
-        total_tasks = len(tasks)
-        completion_percentage = (completed_tasks / total_tasks) * 100
-        
-        if completion_percentage >= 70:
-            logger.info(f"Plan {plan.id} has {completion_percentage:.1f}% tasks completed. Triggering regeneration.")
-            return True
-        
-        # Check skill improvement (Requirement 4.3)
-        # Get profile state at the time of plan generation
-        result = await db.execute(
-            select(ProfileHistory)
-            .where(
-                and_(
-                    ProfileHistory.user_id == plan.user_id,
-                    ProfileHistory.created_at <= plan.generated_at
-                )
-            )
-            .order_by(desc(ProfileHistory.created_at))
-            .limit(1)
+
+        logger.info(
+            "Plan %s block is completed (level_up_applied=true). Triggering regeneration for next block.",
+            plan.id,
         )
-        historical_profile = result.scalar_one_or_none()
-        
-        if historical_profile:
-            # Compare current scores with historical scores
-            skills = [
-                ("communication", profile.communication_score, historical_profile.communication_score),
-                ("emotional_intelligence", profile.emotional_intelligence_score, historical_profile.emotional_intelligence_score),
-                ("critical_thinking", profile.critical_thinking_score, historical_profile.critical_thinking_score),
-                ("time_management", profile.time_management_score, historical_profile.time_management_score),
-                ("leadership", profile.leadership_score, historical_profile.leadership_score)
-            ]
-            
-            for skill_name, current_score, historical_score in skills:
-                improvement = current_score - historical_score
-                if improvement >= 15:
-                    logger.info(f"Skill {skill_name} improved by {improvement:.1f} points. Triggering plan regeneration.")
-                    return True
-        
-        return False
+        return True
     
     async def _generate_new_plan(
         self,
@@ -1280,7 +1269,11 @@ class PlanService:
         previous_plans = previous_plans_result.scalars().all()
         
         # Step 4: Generate plan using LLM (Requirements 3.2, 3.3, 3.4)
+        yandex_folder_id = str(settings.YANDEX_FOLDER_ID or "").strip()
+        yandex_api_key = str(settings.YANDEX_API_KEY or "").strip()
         try:
+            if not yandex_folder_id or not yandex_api_key:
+                raise RuntimeError("Yandex LLM configuration is incomplete")
             plan_content = await self.llm_service.generate_development_plan(
                 profile=profile,
                 weaknesses=weaknesses,

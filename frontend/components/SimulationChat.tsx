@@ -41,6 +41,13 @@ function normalizeTranscript(text: string) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+function looksLikeMojibake(text: string) {
+  const value = String(text || "");
+  if (!value) return false;
+  const chunks = value.match(/(?:Р.|С.)/g) || [];
+  return chunks.length >= 4 && chunks.join("").length >= value.length * 0.6;
+}
+
 function statusLabel(value: string) {
   const v = String(value || "").toLowerCase();
   if (v === "pending") return "в очереди";
@@ -85,8 +92,27 @@ export function SimulationChat(props: {
       const raw = sessionStorage.getItem(key);
       if (!raw) return;
       const parsed = JSON.parse(raw);
+      let dropCorruptedCache = false;
+
       if (Array.isArray(parsed?.messages)) {
-        setMessages(parsed.messages);
+        const restoredMessages = parsed.messages as Message[];
+        const onlyIntro =
+          restoredMessages.length === 1 &&
+          restoredMessages[0]?.role === "ai" &&
+          restoredMessages[0]?.kind === "text";
+        const introText =
+          onlyIntro && restoredMessages[0].kind === "text"
+            ? String(restoredMessages[0].text || "")
+            : "";
+        if (onlyIntro && looksLikeMojibake(introText)) {
+          dropCorruptedCache = true;
+        } else {
+          setMessages(restoredMessages);
+        }
+      }
+      if (dropCorruptedCache) {
+        sessionStorage.removeItem(key);
+        return;
       }
       if (typeof parsed?.input === "string") {
         setInput(parsed.input);

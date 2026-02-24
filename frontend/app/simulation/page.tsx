@@ -14,6 +14,13 @@ type Test = {
   created_at: string;
 };
 
+type ActivePlan = {
+  final_stage?: {
+    final_test_id?: number | null;
+    final_simulation_id?: number | null;
+  } | null;
+} | null;
+
 type BaseScenario = {
   id: string;
   title: string;
@@ -21,21 +28,43 @@ type BaseScenario = {
   href: string;
 };
 
-function isFinalItem(test: Test) {
+function isFinalItem(test: Test, finalIds: Set<number>) {
   const title = String(test.title || "").toLowerCase();
   const description = String(test.description || "").toLowerCase();
-  return title.includes("[final]") || description.includes("[final]");
+  const text = `${title} ${description}`;
+  return (
+    finalIds.has(Number(test.id)) ||
+    text.includes("[final]") ||
+    text.includes("финальн") ||
+    text.includes("итогов")
+  );
 }
 
 export default function SimulationsPage() {
   const [tests, setTests] = useState<Test[]>([]);
+  const [finalItemIds, setFinalItemIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const run = async () => {
       try {
-        const res = await api.get("/tests", { params: { limit: 200 } });
-        setTests(Array.isArray(res.data) ? res.data : []);
+        const [testsRes, planRes] = await Promise.allSettled([
+          api.get<Test[]>("/tests", { params: { limit: 300 } }),
+          api.get<ActivePlan>("/plans/me/active"),
+        ]);
+
+        if (testsRes.status === "fulfilled") {
+          setTests(Array.isArray(testsRes.value.data) ? testsRes.value.data : []);
+        }
+
+        if (planRes.status === "fulfilled") {
+          const finalStage = planRes.value.data?.final_stage;
+          const ids = [
+            Number(finalStage?.final_test_id || 0),
+            Number(finalStage?.final_simulation_id || 0),
+          ].filter((id) => Number.isFinite(id) && id > 0);
+          setFinalItemIds(ids);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -46,9 +75,10 @@ export default function SimulationsPage() {
     run();
   }, []);
 
+  const finalIdSet = useMemo(() => new Set(finalItemIds), [finalItemIds]);
   const simulations = useMemo(
-    () => tests.filter((t) => String(t.type).toLowerCase() === "simulation" && !isFinalItem(t)),
-    [tests]
+    () => tests.filter((t) => String(t.type).toLowerCase() === "simulation" && !isFinalItem(t, finalIdSet)),
+    [tests, finalIdSet]
   );
 
   const baseScenarios = useMemo<BaseScenario[]>(

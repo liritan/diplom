@@ -14,27 +14,56 @@ type Test = {
   created_at: string;
 };
 
+type ActivePlan = {
+  final_stage?: {
+    final_test_id?: number | null;
+    final_simulation_id?: number | null;
+  } | null;
+} | null;
+
 function typeLabel(t: string) {
   if (t === "case") return "Кейс";
   if (t === "simulation") return "Симуляция";
   return "Тест";
 }
 
-function isFinalItem(test: Test) {
+function isFinalItem(test: Test, finalIds: Set<number>) {
   const title = String(test.title || "").toLowerCase();
   const description = String(test.description || "").toLowerCase();
-  return title.includes("[final]") || description.includes("[final]");
+  const text = `${title} ${description}`;
+  return (
+    finalIds.has(Number(test.id)) ||
+    text.includes("[final]") ||
+    text.includes("финальн") ||
+    text.includes("итогов")
+  );
 }
 
 export default function TestsPage() {
   const [tests, setTests] = useState<Test[]>([]);
+  const [finalItemIds, setFinalItemIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const run = async () => {
       try {
-        const res = await api.get("/tests");
-        setTests(res.data);
+        const [testsRes, planRes] = await Promise.allSettled([
+          api.get<Test[]>("/tests", { params: { limit: 300 } }),
+          api.get<ActivePlan>("/plans/me/active"),
+        ]);
+
+        if (testsRes.status === "fulfilled") {
+          setTests(Array.isArray(testsRes.value.data) ? testsRes.value.data : []);
+        }
+
+        if (planRes.status === "fulfilled") {
+          const finalStage = planRes.value.data?.final_stage;
+          const ids = [
+            Number(finalStage?.final_test_id || 0),
+            Number(finalStage?.final_simulation_id || 0),
+          ].filter((id) => Number.isFinite(id) && id > 0);
+          setFinalItemIds(ids);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -44,9 +73,10 @@ export default function TestsPage() {
     run();
   }, []);
 
+  const finalIdSet = useMemo(() => new Set(finalItemIds), [finalItemIds]);
   const list = useMemo(
-    () => tests.filter((t) => t.type !== "simulation" && !isFinalItem(t)),
-    [tests]
+    () => tests.filter((t) => t.type !== "simulation" && !isFinalItem(t, finalIdSet)),
+    [tests, finalIdSet]
   );
 
   return (

@@ -1,0 +1,63 @@
+
+> frontend@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 4.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 9s (733 modules)
+ GET / 200 in 9442ms
+ ✓ Compiled in 935ms (316 modules)
+ ○ Compiling /simulation/time-management ...
+ ✓ Compiled /simulation/time-management in 1912ms (768 modules)
+ GET /simulation/time-management 200 in 2222ms
+ ○ Compiling /simulation/leadership ...
+ ✓ Compiled /simulation/leadership in 515ms (774 modules)
+ GET /simulation/leadership 200 in 657ms
+ GET / 200 in 86ms
+ ✓ Compiled /favicon.ico in 486ms (474 modules)
+ GET /favicon.ico 200 in 620ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 601ms (814 modules)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 4.5s (1843 modules)
+ ✓ Compiled /simulation/time-management in 233ms (997 modules)
+ ✓ Compiled /simulation/leadership in 247ms (1001 modules)
+ ✓ Compiled in 2.2s (1829 modules)
+ ✓ Compiled in 1131ms (1829 modules)
+ GET /simulation/leadership 200 in 211ms
+ ✓ Compiled /favicon.ico in 388ms (992 modules)
+ GET /favicon.ico 200 in 499ms
+ ○ Compiling /analysis ...
+ ✓ Compiled /analysis in 1646ms (1875 modules)
+ ○ Compiling /chat ...
+ ✓ Compiled /chat in 884ms (1883 modules)
+ GET /simulation/leadership 200 in 216ms
+ ✓ Compiled /simulation/time-management in 302ms (1016 modules)
+ ○ Compiling /achievements ...
+ ✓ Compiled /achievements in 580ms (1893 modules)
+ GET /simulation/leadership 200 in 116ms
+ GET /favicon.ico 200 in 28ms
+ ○ Compiling /materials ...
+ ✓ Compiled /materials in 867ms (1879 modules)
+ ○ Compiling /materials/library ...
+ ✓ Compiled /materials/library in 713ms (1885 modules)
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 754ms (1886 modules)
+ ✓ Compiled in 1142ms (1346 modules)
+ GET /simulation/leadership 200 in 147ms
+ GET /simulation/time-management 200 in 67ms
+ ○ Compiling /history ...
+ ✓ Compiled /history in 838ms (1338 modules)
+ GET /simulation/time-management 200 in 155ms
+ ✓ Compiled /favicon.ico in 265ms (489 modules)
+ GET /favicon.ico 200 in 413ms
+ ○ Compiling /chat ...
+ ✓ Compiled /chat in 939ms (454 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 673ms (454 modules)
+ GET / 200 in 934ms
+ GET / 200 in 46ms

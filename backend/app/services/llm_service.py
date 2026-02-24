@@ -224,14 +224,19 @@ class LLMService:
             enable_rate_limiting: Whether to enable rate limiting (default: True)
             max_requests_per_minute: Maximum requests per minute (default: 60)
         """
-        self.folder_id = settings.YANDEX_FOLDER_ID
-        self.api_key = settings.YANDEX_API_KEY
-        self.llm = ChatYandexGPT(
-            folder_id=self.folder_id,
-            api_key=self.api_key,
-            model_uri=f"gpt://{self.folder_id}/yandexgpt-lite",
-            temperature=0.6,
-        )
+        self.folder_id = str(settings.YANDEX_FOLDER_ID or "").strip()
+        self.api_key = str(settings.YANDEX_API_KEY or "").strip()
+        self.llm_enabled = bool(self.folder_id and self.api_key)
+        self.llm = None
+        if self.llm_enabled:
+            self.llm = ChatYandexGPT(
+                folder_id=self.folder_id,
+                api_key=self.api_key,
+                model_uri=f"gpt://{self.folder_id}/yandexgpt-lite",
+                temperature=0.6,
+            )
+        else:
+            logger.warning("Yandex LLM config is incomplete. LLM calls will use graceful fallback.")
         
         # Initialize rate limiter
         self.enable_rate_limiting = enable_rate_limiting
@@ -266,6 +271,13 @@ class LLMService:
         """Record a request for rate limiting."""
         if self.enable_rate_limiting and self.rate_limiter:
             self.rate_limiter.record_request()
+
+    def _ensure_llm_available(self, method: str) -> None:
+        if self.llm_enabled and self.llm is not None:
+            return
+        raise LLMUnavailableError(
+            f"LLM backend is not configured for method '{method}'."
+        )
     
     async def analyze_communication(
         self, 
@@ -290,6 +302,8 @@ class LLMService:
         # Generate unique request ID for tracking
         request_id = str(uuid.uuid4())
         start_time = time.time()
+
+        self._ensure_llm_available("analyze_communication")
         
         # Check rate limit before making request
         self._check_rate_limit()
@@ -420,6 +434,8 @@ class LLMService:
         # Generate unique request ID for tracking
         request_id = str(uuid.uuid4())
         start_time = time.time()
+
+        self._ensure_llm_available("analyze_test_answers")
         
         # Check rate limit before making request
         self._check_rate_limit()
@@ -554,6 +570,8 @@ class LLMService:
         # Generate unique request ID for tracking
         request_id = str(uuid.uuid4())
         start_time = time.time()
+
+        self._ensure_llm_available("generate_development_plan")
         
         # Check rate limit before making request
         self._check_rate_limit()

@@ -10,13 +10,14 @@ import logging
 from typing import Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from app.db.session import AsyncSessionLocal
 from app.models.analysis import AnalysisTask, AnalysisResult
 from app.models.chat import ChatMessage, ChatAudio
 from app.models.content import UserTestResult, CaseSolution, Test
+from app.models.profile import SoftSkillsProfile
 from app.services.llm_service import LLMService, LLMUnavailableError, LLMRateLimitError, LLMInvalidResponseError
 from app.services.profile_service import ProfileService
 from app.services.plan_service import PlanService

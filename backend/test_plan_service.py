@@ -8,7 +8,7 @@ This script is intentionally framework-free so it can run with:
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from app.db.base import DevelopmentPlan, SoftSkillsProfile
+from app.db.base import DevelopmentPlan, SoftSkillsProfile, Test
 from app.schemas.plan import (
     DevelopmentPlanContent,
     MaterialItem,
@@ -92,10 +92,78 @@ def test_check_material_uniqueness():
     assert service._check_material_uniqueness(not_unique_enough, previous_plan) is False
 
 
+def test_assign_tests_to_materials_avoids_repeats_with_skill_alternatives():
+    service = PlanService()
+
+    materials = [
+        {"id": "mat_comm_1", "skill": "communication"},
+        {"id": "mat_lead_1", "skill": "leadership"},
+    ]
+    tests = [
+        Test(id=1, title="Communication: baseline", description="", type="quiz"),
+        Test(id=2, title="Communication: practice", description="", type="quiz"),
+        Test(id=3, title="Leadership: baseline", description="", type="quiz"),
+    ]
+    existing_map = {
+        "mat_comm_1": 1,
+        "mat_lead_1": 3,
+    }
+
+    mapping = service._assign_tests_to_materials(
+        materials=materials,
+        tests=tests,
+        existing_map=existing_map,
+        completed_test_ids={1, 3},
+    )
+
+    assert mapping.get("mat_comm_1") == 2
+    assert mapping.get("mat_lead_1") == 3
+
+
+def test_collect_block_achievements_merges_history():
+    service = PlanService()
+    plans = [
+        DevelopmentPlan(
+            id=10,
+            user_id=1,
+            generated_at=datetime.now(timezone.utc) - timedelta(days=2),
+            is_archived=True,
+            content={
+                "target_difficulty": "beginner",
+                "block_achievements": [
+                    {"id": "block_10_beginner", "title": "Блок 1", "achieved_at": "2026-01-10T10:00:00+00:00"},
+                ],
+            },
+        ),
+        DevelopmentPlan(
+            id=11,
+            user_id=1,
+            generated_at=datetime.now(timezone.utc) - timedelta(days=1),
+            is_archived=True,
+            content={
+                "target_difficulty": "intermediate",
+                "final_stage": {
+                    "level_up_applied": True,
+                    "achievement_title": "Блок 2",
+                    "completed_at": "2026-01-20T10:00:00+00:00",
+                },
+            },
+        ),
+    ]
+
+    achievements = service._collect_block_achievements(plans)
+    titles = [a.get("title") for a in achievements]
+
+    assert "Блок 1" in titles
+    assert "Блок 2" in titles
+
+
 def main():
     tests = [
         test_identify_weaknesses,
         test_check_material_uniqueness,
+        test_assign_tests_to_materials_avoids_repeats_with_skill_alternatives,
+        test_collect_block_achievements_merges_history,
     ]
 
     failed = 0

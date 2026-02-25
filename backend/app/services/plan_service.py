@@ -90,13 +90,20 @@ class PlanService:
     def _legacy_final_simulation_title(self, target_difficulty: str) -> str:
         return f"[FINAL] Итоговая ролевая игра ({target_difficulty})"
 
+    def _final_simulation_description(self) -> str:
+        return "Финальная ролевая игра блока: комплексная проверка soft skills."
+
     def _final_test_description(self) -> str:
         return "Комплексная проверка по всем зонам роста текущего блока."
 
     def _final_simulation_intro(self) -> str:
         return (
-            "Начнем финальную ролевую практику. Ваша задача — провести сложный рабочий диалог спокойно и структурно: "
-            "прояснить позицию собеседника, зафиксировать риски, предложить реалистичные шаги и договориться о следующем действии."
+            "Ситуация: вы руководите мини-проектом, и за два дня до дедлайна появляется сразу несколько проблем. "
+            "Один сотрудник срывает срок и защищается в резкой форме, второй перегружен и молчит о рисках, "
+            "а заказчик требует подтвердить финальную дату без переноса. "
+            "Ваша задача в диалоге: спокойно выстроить коммуникацию, показать эмоциональную устойчивость и эмпатию, "
+            "структурно проанализировать риски, расставить приоритеты по времени и предложить лидерский план действий. "
+            "Нужно договориться о конкретных шагах, сроках и ответственности каждого участника."
         )
 
     def _is_final_title(self, value: str) -> bool:
@@ -173,12 +180,81 @@ class PlanService:
         target = str(content.get("target_difficulty") or "beginner")
         return f"Пройден первый {self._difficulty_ru_label(target)} блок"
 
+    def _collect_block_achievements(self, plans: List[DevelopmentPlan]) -> List[Dict[str, Any]]:
+        merged: List[Dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        seen_fallback: set[tuple[str, str]] = set()
+
+        for plan in plans:
+            content = plan.content if isinstance(plan.content, dict) else {}
+
+            raw_achievements = content.get("block_achievements")
+            plan_achievements = list(raw_achievements) if isinstance(raw_achievements, list) else []
+
+            # Backward compatibility: recover achievement from final_stage if list is absent.
+            final_stage = content.get("final_stage")
+            if isinstance(final_stage, dict) and bool(final_stage.get("level_up_applied")):
+                title = str(final_stage.get("achievement_title") or "").strip()
+                if title:
+                    fallback_id = f"block_{plan.id}_{str(content.get('target_difficulty') or 'unknown')}"
+                    plan_achievements.append(
+                        {
+                            "id": fallback_id,
+                            "title": title,
+                            "achieved_at": final_stage.get("completed_at"),
+                        }
+                    )
+
+            for item in plan_achievements:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("title") or "").strip()
+                if not title:
+                    continue
+
+                item_id = str(item.get("id") or "").strip()
+                achieved_at = item.get("achieved_at")
+                achieved_at_key = str(achieved_at or "")
+
+                if item_id:
+                    if item_id in seen_ids:
+                        continue
+                    seen_ids.add(item_id)
+                else:
+                    fallback_key = (title, achieved_at_key)
+                    if fallback_key in seen_fallback:
+                        continue
+                    seen_fallback.add(fallback_key)
+
+                merged.append(
+                    {
+                        "id": item_id or f"legacy_{plan.id}_{len(merged) + 1}",
+                        "title": title,
+                        "achieved_at": achieved_at,
+                    }
+                )
+
+        def _sort_key(item: Dict[str, Any]) -> float:
+            parsed = self._parse_iso_datetime(item.get("achieved_at"))
+            if parsed is None:
+                return 0.0
+            return float(parsed.timestamp())
+
+        merged.sort(key=_sort_key, reverse=True)
+        return merged
+
     def _assign_tests_to_materials(
         self,
         materials: List[Dict[str, Any]],
         tests: List[Test],
         existing_map: Dict[str, Any],
+        completed_test_ids: Optional[set[int]] = None,
     ) -> Dict[str, int]:
+        completed_ids = {
+            int(test_id)
+            for test_id in (completed_test_ids or set())
+            if str(test_id).isdigit() and int(test_id) > 0
+        }
         filtered_tests = [t for t in tests if str(t.type).lower() != "simulation" and not self._is_final_test(t)]
         tests_by_id = {int(t.id): t for t in filtered_tests}
         skill_keywords = self._skill_keywords()
@@ -201,6 +277,53 @@ class PlanService:
         mapping: Dict[str, int] = {}
         used_ids: set[int] = set()
 
+        def _can_reuse_existing(
+            current_id: int,
+            skill_candidate_ids: List[int],
+        ) -> bool:
+            if current_id not in tests_by_id or current_id in used_ids:
+                return False
+            if current_id not in completed_ids:
+                return True
+            if not skill_candidate_ids:
+                return True
+            has_new_alternative = any(
+                candidate_id != current_id and candidate_id not in completed_ids
+                for candidate_id in skill_candidate_ids
+            )
+            return not has_new_alternative
+
+        def _pick_candidate(candidate_ids: List[int], start_idx: int) -> tuple[Optional[int], int]:
+            if not candidate_ids:
+                return None, start_idx
+
+            # Prefer tests that user has not completed in previous plan blocks.
+            for offset in range(len(candidate_ids)):
+                idx = (start_idx + offset) % len(candidate_ids)
+                candidate_id = candidate_ids[idx]
+                if candidate_id in used_ids or candidate_id in completed_ids:
+                    continue
+                return candidate_id, idx + 1
+
+            # Then allow any non-used test.
+            for offset in range(len(candidate_ids)):
+                idx = (start_idx + offset) % len(candidate_ids)
+                candidate_id = candidate_ids[idx]
+                if candidate_id in used_ids:
+                    continue
+                return candidate_id, idx + 1
+
+            # If all are used, still prefer not-completed to reduce repetition.
+            for offset in range(len(candidate_ids)):
+                idx = (start_idx + offset) % len(candidate_ids)
+                candidate_id = candidate_ids[idx]
+                if candidate_id in completed_ids:
+                    continue
+                return candidate_id, idx + 1
+
+            idx = start_idx % len(candidate_ids)
+            return candidate_ids[idx], start_idx + 1
+
         for material in materials:
             material_id = str(material.get("id", "")).strip()
             if not material_id:
@@ -211,39 +334,22 @@ class PlanService:
                 current_id = int(current_value) if current_value is not None else None
             except Exception:
                 current_id = None
-            if current_id is not None and current_id in tests_by_id and current_id not in used_ids:
+
+            skill = str(material.get("skill", "")).strip().lower()
+            candidate_ids = tests_by_skill.get(skill) or []
+
+            if current_id is not None and _can_reuse_existing(current_id, candidate_ids):
                 mapping[material_id] = current_id
                 used_ids.add(current_id)
                 continue
 
-            skill = str(material.get("skill", "")).strip().lower()
-            candidate_ids = tests_by_skill.get(skill) or []
             selected_id: Optional[int] = None
             if candidate_ids:
-                start_idx = usage_cursor.get(skill, 0)
-                for offset in range(len(candidate_ids)):
-                    idx = (start_idx + offset) % len(candidate_ids)
-                    candidate_id = candidate_ids[idx]
-                    if candidate_id not in used_ids:
-                        selected_id = candidate_id
-                        usage_cursor[skill] = idx + 1
-                        break
-                if selected_id is None:
-                    idx = usage_cursor.get(skill, 0) % len(candidate_ids)
-                    selected_id = candidate_ids[idx]
-                    usage_cursor[skill] = usage_cursor.get(skill, 0) + 1
-            elif fallback_ids:
-                start_idx = fallback_cursor
-                for offset in range(len(fallback_ids)):
-                    idx = (start_idx + offset) % len(fallback_ids)
-                    candidate_id = fallback_ids[idx]
-                    if candidate_id not in used_ids:
-                        selected_id = candidate_id
-                        fallback_cursor = idx + 1
-                        break
-                if selected_id is None:
-                    selected_id = fallback_ids[fallback_cursor % len(fallback_ids)]
-                    fallback_cursor += 1
+                selected_id, next_cursor = _pick_candidate(candidate_ids, usage_cursor.get(skill, 0))
+                usage_cursor[skill] = next_cursor
+
+            if selected_id is None and fallback_ids:
+                selected_id, fallback_cursor = _pick_candidate(fallback_ids, fallback_cursor)
 
             if selected_id is not None:
                 mapping[material_id] = selected_id
@@ -352,7 +458,7 @@ class PlanService:
         if final_simulation is None:
             final_simulation = Test(
                 title=final_simulation_title,
-                description=self._final_simulation_intro(),
+                description=self._final_simulation_description(),
                 type="simulation",
             )
             db.add(final_simulation)
@@ -361,7 +467,7 @@ class PlanService:
             final_simulation.title = self._strip_final_marker(
                 str(final_simulation.title or final_simulation_title)
             ) or final_simulation_title
-            final_simulation.description = self._final_simulation_intro()
+            final_simulation.description = self._final_simulation_description()
 
         final_stage["final_test_id"] = int(final_test.id)
         final_stage["final_simulation_id"] = int(final_simulation.id)
@@ -373,6 +479,7 @@ class PlanService:
         test_ids: List[int],
         db: AsyncSession,
         completed_after: Optional[datetime] = None,
+        completed_before: Optional[datetime] = None,
     ) -> set[int]:
         unique_ids = sorted({int(test_id) for test_id in test_ids if int(test_id) > 0})
         if not unique_ids:
@@ -385,6 +492,13 @@ class PlanService:
             else:
                 completed_after_utc = completed_after
 
+        completed_before_utc: Optional[datetime] = None
+        if completed_before is not None:
+            if completed_before.tzinfo is None:
+                completed_before_utc = completed_before.replace(tzinfo=timezone.utc)
+            else:
+                completed_before_utc = completed_before
+
         completed_ids: set[int] = set()
         results_query = select(UserTestResult.test_id).where(
             UserTestResult.user_id == user_id,
@@ -392,6 +506,8 @@ class PlanService:
         )
         if completed_after_utc is not None:
             results_query = results_query.where(UserTestResult.completed_at >= completed_after_utc)
+        if completed_before_utc is not None:
+            results_query = results_query.where(UserTestResult.completed_at < completed_before_utc)
         results_res = await db.execute(results_query)
         for value in list(results_res.scalars().all()):
             completed_ids.add(int(value))
@@ -402,6 +518,8 @@ class PlanService:
         )
         if completed_after_utc is not None:
             cases_query = cases_query.where(CaseSolution.created_at >= completed_after_utc)
+        if completed_before_utc is not None:
+            cases_query = cases_query.where(CaseSolution.created_at < completed_before_utc)
         cases_res = await db.execute(cases_query)
         for value in list(cases_res.scalars().all()):
             completed_ids.add(int(value))
@@ -443,9 +561,28 @@ class PlanService:
 
         tests_res = await db.execute(select(Test).where(Test.type != "simulation").order_by(Test.id.asc()))
         regular_tests = [t for t in list(tests_res.scalars().all()) if not self._is_final_test(t)]
+        regular_test_ids: List[int] = []
+        for t in regular_tests:
+            try:
+                test_id = int(t.id)
+            except Exception:
+                continue
+            if test_id > 0:
+                regular_test_ids.append(test_id)
+        completed_before_plan = await self._get_completion_test_ids(
+            user_id,
+            regular_test_ids,
+            db,
+            completed_before=plan.generated_at,
+        )
         raw_map = content.get("material_test_map")
         material_test_map = raw_map if isinstance(raw_map, dict) else {}
-        computed_map = self._assign_tests_to_materials(materials, regular_tests, material_test_map)
+        computed_map = self._assign_tests_to_materials(
+            materials,
+            regular_tests,
+            material_test_map,
+            completed_test_ids=completed_before_plan,
+        )
         if computed_map != material_test_map:
             material_test_map = computed_map
             content["material_test_map"] = material_test_map
@@ -1435,7 +1572,13 @@ class PlanService:
             .limit(3)  # Consider last 3 plans
         )
         previous_plans = previous_plans_result.scalars().all()
-        
+        achievement_plans_result = await db.execute(
+            select(DevelopmentPlan)
+            .where(DevelopmentPlan.user_id == user_id)
+            .order_by(desc(DevelopmentPlan.generated_at))
+            .limit(100)
+        )
+        achievement_plans = achievement_plans_result.scalars().all()        
         # Step 4: Generate plan using LLM (Requirements 3.2, 3.3, 3.4)
         yandex_folder_id = str(settings.YANDEX_FOLDER_ID or "").strip()
         yandex_api_key = str(settings.YANDEX_API_KEY or "").strip()
@@ -1515,7 +1658,12 @@ class PlanService:
             previous_plans=list(previous_plans),
         )
 
-        plan_content.recommended_tests = await self._select_recommended_tests(weaknesses, target_difficulty, db)
+        plan_content.recommended_tests = await self._select_recommended_tests(
+            user_id=user_id,
+            weaknesses=weaknesses,
+            target_difficulty=target_difficulty,
+            db=db,
+        )
         
         # Step 5: Validate material uniqueness (Requirement 4.5, Property 13)
         if previous_plans:
@@ -1526,6 +1674,7 @@ class PlanService:
         # Step 6: Save new plan (Requirement 3.5, Property 8)
         payload = plan_content.dict()
         payload["target_difficulty"] = target_difficulty
+        payload["block_achievements"] = self._collect_block_achievements(achievement_plans)
         new_plan = DevelopmentPlan(
             user_id=user_id,
             is_archived=False,
@@ -1539,7 +1688,13 @@ class PlanService:
         logger.info(f"Successfully generated new development plan {new_plan.id} for user {user_id}")
         return new_plan
 
-    async def _select_recommended_tests(self, weaknesses: List[str], target_difficulty: str, db: AsyncSession) -> List[TestRecommendation]:
+    async def _select_recommended_tests(
+        self,
+        user_id: int,
+        weaknesses: List[str],
+        target_difficulty: str,
+        db: AsyncSession,
+    ) -> List[TestRecommendation]:
         query = await db.execute(select(Test).where(Test.type != "simulation").order_by(Test.id.asc()))
         tests = [t for t in list(query.scalars().all()) if not self._is_final_test(t)]
         if not tests:
@@ -1550,26 +1705,73 @@ class PlanService:
         others = [t for t in tests if t not in preferred]
         tests = preferred + others
 
+        all_test_ids: List[int] = []
+        for t in tests:
+            try:
+                test_id = int(t.id)
+            except Exception:
+                continue
+            if test_id > 0:
+                all_test_ids.append(test_id)
+        completed_test_ids = await self._get_completion_test_ids(
+            user_id=user_id,
+            test_ids=all_test_ids,
+            db=db,
+        )
+
         skill_keywords = self._skill_keywords()
 
-        def _resolve_keywords(weakness: str) -> List[str]:
+        def _resolve_skill(weakness: str) -> Optional[str]:
             if not weakness:
-                return []
+                return None
             normalized = weakness.lower().replace("-", " ").replace("_", " ")
-            for keywords in skill_keywords.values():
+            for skill, keywords in skill_keywords.items():
                 if any(keyword in normalized for keyword in keywords):
-                    return keywords
-            return []
+                    return skill
+            return None
+
+        tests_by_skill: Dict[str, List[Test]] = {skill: [] for skill in skill_keywords.keys()}
+        for t in tests:
+            hay = f"{t.title} {t.description}".lower()
+            matched_skill: Optional[str] = None
+            for skill, keywords in skill_keywords.items():
+                if any(keyword in hay for keyword in keywords):
+                    matched_skill = skill
+                    break
+            if matched_skill is not None:
+                tests_by_skill[matched_skill].append(t)
+
+        def _pick_from_candidates(candidates: List[Test], current: List[Test]) -> Optional[Test]:
+            preferred_fresh = [
+                t for t in candidates
+                if t not in current and int(t.id) not in completed_test_ids
+            ]
+            if preferred_fresh:
+                return preferred_fresh[0]
+            fallback = [t for t in candidates if t not in current]
+            if fallback:
+                return fallback[0]
+            return None
 
         picked: List[Test] = []
         for w in weaknesses:
-            keywords = _resolve_keywords(w)
-            for t in tests:
-                hay = f"{t.title} {t.description}".lower()
-                if any(k in hay for k in keywords):
-                    if t not in picked:
-                        picked.append(t)
-                    break
+            skill = _resolve_skill(w)
+            if not skill:
+                continue
+            selected = _pick_from_candidates(tests_by_skill.get(skill, []), picked)
+            if selected is not None:
+                picked.append(selected)
+            if len(picked) >= 3:
+                break
+
+        for t in tests:
+            if len(picked) >= 3:
+                break
+            if t in picked:
+                continue
+            if int(t.id) in completed_test_ids:
+                continue
+            picked.append(t)
 
         for t in tests:
             if len(picked) >= 3:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import api from "@/lib/api";
@@ -107,11 +107,23 @@ function progressBarClass(percentage: number) {
   return "bg-beige-300";
 }
 
+function apiErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null) {
+    const response = (error as { response?: { data?: { detail?: unknown } } }).response;
+    const detail = response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+  }
+  return fallback;
+}
+
 export default function MaterialsPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [advancingLevel, setAdvancingLevel] = useState(false);
+  const reloadTimerIds = useRef<number[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -121,6 +133,17 @@ export default function MaterialsPage() {
       console.error(e);
     }
   }, []);
+
+  const scheduleLoad = useCallback(
+    (delayMs: number) => {
+      const timerId = window.setTimeout(() => {
+        reloadTimerIds.current = reloadTimerIds.current.filter((id) => id !== timerId);
+        load().catch(() => undefined);
+      }, delayMs);
+      reloadTimerIds.current.push(timerId);
+    },
+    [load]
+  );
 
   useEffect(() => {
     const run = async () => {
@@ -151,14 +174,23 @@ export default function MaterialsPage() {
     };
   }, [load]);
 
+  useEffect(() => {
+    return () => {
+      for (const timerId of reloadTimerIds.current) {
+        window.clearTimeout(timerId);
+      }
+      reloadTimerIds.current = [];
+    };
+  }, []);
+
   const completeTask = async (taskId: string) => {
     try {
       const res = await api.post(`/plans/me/tasks/${taskId}/complete`);
       setMessage(`Задание выполнено. Прогресс плана: ${res.data.plan_progress}%`);
       await load();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      setMessage(e?.response?.data?.detail || "Ошибка при отметке задания");
+      setMessage(apiErrorMessage(e, "Ошибка при отметке задания"));
     }
   };
 
@@ -174,9 +206,9 @@ export default function MaterialsPage() {
         `Материал: ${res.data.material_percentage}% выполнено. Общий прогресс: ${res.data.plan_progress}%`
       );
       await load();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      setMessage(e?.response?.data?.detail || "Ошибка при отметке материала");
+      setMessage(apiErrorMessage(e, "Ошибка при отметке материала"));
     }
   };
 
@@ -184,12 +216,10 @@ export default function MaterialsPage() {
     try {
       const res = await api.post("/plans/me/generate");
       setMessage(res.data.message || "Генерация плана запущена");
-      setTimeout(() => {
-        load().catch(() => undefined);
-      }, 2500);
-    } catch (e: any) {
+      scheduleLoad(2500);
+    } catch (e: unknown) {
       console.error(e);
-      setMessage(e?.response?.data?.detail || "Ошибка при генерации плана");
+      setMessage(apiErrorMessage(e, "Ошибка при генерации плана"));
     }
   };
 
@@ -199,9 +229,10 @@ export default function MaterialsPage() {
       const res = await api.post("/plans/me/final-stage/advance");
       setMessage(res.data?.message || "Переход на следующий уровень выполнен");
       await load();
-    } catch (e: any) {
+      scheduleLoad(5500);
+    } catch (e: unknown) {
       console.error(e);
-      setMessage(e?.response?.data?.detail || "Ошибка перехода на следующий уровень");
+      setMessage(apiErrorMessage(e, "Ошибка перехода на следующий уровень"));
     } finally {
       setAdvancingLevel(false);
     }
@@ -413,21 +444,25 @@ export default function MaterialsPage() {
                     </div>
                   </div>
 
-                  {(plan.block_achievements ?? []).length ? (
-                    <div className="mt-6">
-                      <div className="text-sm font-bold text-brown-800">Достижения блока</div>
-                      <div className="mt-3 space-y-2">
-                        {(plan.block_achievements ?? []).map((a) => (
+                  <div className="mt-6">
+                    <div className="text-sm font-bold text-brown-800">Достижения блока</div>
+                    <div className="mt-3 space-y-2">
+                      {(plan.block_achievements ?? []).length ? (
+                        (plan.block_achievements ?? []).map((a) => (
                           <div
                             key={a.id}
                             className="bg-white border border-beige-300 rounded-lg px-4 py-3 text-brown-800 text-sm"
                           >
                             {a.title}
                           </div>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <div className="bg-beige-100 border border-beige-300 rounded-lg px-4 py-3 text-brown-600 text-sm">
+                          Пока достижений нет — завершите финальные задания текущего блока.
+                        </div>
+                      )}
                     </div>
-                  ) : null}
+                  </div>
                 </Card>
               </div>
 
@@ -509,3 +544,4 @@ export default function MaterialsPage() {
     </AppLayout>
   );
 }
+

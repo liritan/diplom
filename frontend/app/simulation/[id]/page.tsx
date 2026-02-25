@@ -14,6 +14,25 @@ type Test = {
   type: string;
 };
 
+const FINAL_SIMULATION_INTRO =
+  "Начнем финальную ролевую практику. Ваша задача — провести сложный рабочий диалог спокойно и структурно: прояснить позицию собеседника, зафиксировать риски, предложить реалистичные шаги и договориться о следующем действии.";
+
+function sanitizeFinalLabel(value: string) {
+  const cleaned = String(value || "").replace(/\[FINAL\]/gi, "").trim();
+  return cleaned.replace(/\s{2,}/g, " ");
+}
+
+function isFinalSimulation(test: Test) {
+  const title = String(test.title || "").toLowerCase();
+  const description = String(test.description || "").toLowerCase();
+  return (
+    title.includes("[final]") ||
+    title.includes("итоговая ролевая игра") ||
+    description.includes("[final]") ||
+    description.includes("итоговая ролевая игра")
+  );
+}
+
 export default function SimulationByIdPage() {
   const params = useParams() as any;
   const testId = Number(params?.id);
@@ -75,13 +94,19 @@ export default function SimulationByIdPage() {
     );
   }
 
+  const title = sanitizeFinalLabel(test.title);
+  const subtitle = sanitizeFinalLabel(test.description) || "Потренируйтесь в формате чата";
+  const systemIntro = isFinalSimulation(test)
+    ? FINAL_SIMULATION_INTRO
+    : sanitizeFinalLabel(test.description) || "Здравствуйте! Давайте начнём симуляцию.";
+
   return (
     <AppLayout>
       <SimulationChat
         scenario={`sim:${test.id}`}
-        title={test.title}
-        subtitle={test.description || "Потренируйтесь в формате чата"}
-        systemIntro={test.description || "Здравствуйте! Давайте начнём симуляцию."}
+        title={title}
+        subtitle={subtitle}
+        systemIntro={systemIntro}
         apiPaths={{
           reply: `/tests/${test.id}/simulation/reply`,
           voice: `/tests/${test.id}/simulation/voice`,

@@ -111,6 +111,7 @@ export default function MaterialsPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [advancingLevel, setAdvancingLevel] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -189,6 +190,20 @@ export default function MaterialsPage() {
     } catch (e: any) {
       console.error(e);
       setMessage(e?.response?.data?.detail || "Ошибка при генерации плана");
+    }
+  };
+
+  const advanceToNextLevel = async () => {
+    try {
+      setAdvancingLevel(true);
+      const res = await api.post("/plans/me/final-stage/advance");
+      setMessage(res.data?.message || "Переход на следующий уровень выполнен");
+      await load();
+    } catch (e: any) {
+      console.error(e);
+      setMessage(e?.response?.data?.detail || "Ошибка перехода на следующий уровень");
+    } finally {
+      setAdvancingLevel(false);
     }
   };
 
@@ -331,7 +346,7 @@ export default function MaterialsPage() {
                     <div className="mt-6 bg-beige-100 border border-beige-300 rounded-xl p-4">
                       <div className="text-sm font-bold text-brown-800">Финальные задания блока</div>
                       <div className="text-xs text-brown-600 mt-1">
-                        После прохождения обоих заданий уровень будет повышен автоматически.
+                        После прохождения обоих заданий нажмите кнопку перехода на следующий уровень.
                       </div>
 
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -351,6 +366,17 @@ export default function MaterialsPage() {
                         Тест: {finalStage.final_test_completed ? "пройден" : "в процессе"} • Ролевая игра:{" "}
                         {finalStage.final_simulation_completed ? "пройдена" : "в процессе"}
                       </div>
+                      {finalStage.completed && !finalStage.level_up_applied ? (
+                        <div className="mt-3">
+                          <Button
+                            onClick={advanceToNextLevel}
+                            disabled={advancingLevel}
+                            className="bg-accent-button hover:bg-accent-buttonHover text-white font-bold py-2 px-4 rounded-lg uppercase text-xs tracking-wider"
+                          >
+                            {advancingLevel ? "Переход..." : "Перейти на следующий уровень"}
+                          </Button>
+                        </div>
+                      ) : null}
                       {finalStage.level_up_applied ? (
                         <div className="mt-2 text-xs font-bold text-green-700">
                           Уровень повышен. {finalStage.achievement_title || "Блок завершен"}

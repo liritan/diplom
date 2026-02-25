@@ -20,8 +20,6 @@ const menuItems = [
     items: [
       { name: "Тесты", icon: FileText, href: "/tests" },
       { name: "Материалы", icon: BookOpen, href: "/materials" },
-      { name: "Игра: тайм-менеджмент", icon: Mic, href: "/simulation/time-management" },
-      { name: "Игра: лидерство", icon: Users, href: "/simulation/leadership" },
       { name: "Достижения", icon: Award, href: "/achievements" },
       { name: "История", icon: History, href: "/history" },
     ],

@@ -1,6 +1,10 @@
+import asyncio
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.api.api import api_router
@@ -10,43 +14,89 @@ from app.db.session import AsyncSessionLocal
 from app.models.content import Test, Question
 from app.models.user import User, UserRole
 from app.core import security
-import os
 
 # Initialize structured logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
 use_json_logging = os.getenv("USE_JSON_LOGGING", "true").lower() == "true"
 setup_logging(log_level=log_level, use_json=use_json_logging)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# CORS Configuration
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
+def _build_cors_origins() -> list[str]:
+    default_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+    extra = [origin.strip() for origin in str(settings.CORS_ORIGINS or "").split(",") if origin.strip()]
+    merged = list(default_origins)
+    for origin in extra:
+        if origin not in merged:
+            merged.append(origin)
+    return merged
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://(localhost|127\.0\.0\.1)(:\\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+if settings.CORS_ALLOW_ALL:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_build_cors_origins(),
+        allow_origin_regex=(
+            r"^https://.*\.(vercel\.app|onrender\.com)$|^http://(localhost|127\.0\.0\.1)(:\\d+)?$"
+        ),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+
+async def _initialize_database() -> None:
+    max_retries = max(1, int(settings.DB_STARTUP_MAX_RETRIES))
+    retry_delay = max(0.1, float(settings.DB_STARTUP_RETRY_DELAY_SECONDS))
+
+    last_error: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            if settings.CREATE_TABLES_ON_STARTUP:
+                # Safe for existing DB: creates missing tables only.
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
+            else:
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+            return
+        except Exception as exc:  # pragma: no cover - startup operational path
+            last_error = exc
+            logger.warning(
+                "Database startup check failed (attempt %s/%s): %s",
+                attempt,
+                max_retries,
+                exc,
+            )
+            if attempt < max_retries:
+                await asyncio.sleep(retry_delay)
+
+    if last_error is not None:
+        raise last_error
+
+
 @app.on_event("startup")
 async def startup():
-    # Warning: This creates tables on startup. 
-    # In production, use Alembic migrations.
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    await _initialize_database()
 
     async with AsyncSessionLocal() as db:
         try:

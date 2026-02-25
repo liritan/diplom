@@ -43,6 +43,15 @@ class MaterialActionResponse(BaseModel):
     plan_progress: float
 
 
+class FinalStageAdvanceResponse(BaseModel):
+    message: str
+    level_up_applied: bool
+    already_applied: bool
+    new_plan_generated: bool
+    new_plan_id: Optional[int] = None
+    achievement_title: Optional[str] = None
+
+
 @router.get("/me/active", response_model=Optional[DevelopmentPlanWithProgress])
 async def get_active_plan(
     db: AsyncSession = Depends(get_db),
@@ -269,6 +278,41 @@ async def mark_material_article_open(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при отметке материала: {str(e)}")
+
+
+@router.post("/me/final-stage/advance", response_model=FinalStageAdvanceResponse)
+async def advance_final_stage_level(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    try:
+        result = await plan_service.advance_to_next_level(
+            user_id=current_user.id,
+            db=db,
+        )
+        message = (
+            "Уровень обновлён, новый план сформирован."
+            if bool(result.get("new_plan_generated"))
+            else "Уровень обновлён."
+        )
+        if bool(result.get("already_applied")):
+            message = (
+                "Переход уже был выполнен ранее, новый план сформирован."
+                if bool(result.get("new_plan_generated"))
+                else "Переход уже был выполнен ранее."
+            )
+        return FinalStageAdvanceResponse(
+            message=message,
+            level_up_applied=bool(result.get("level_up_applied")),
+            already_applied=bool(result.get("already_applied")),
+            new_plan_generated=bool(result.get("new_plan_generated")),
+            new_plan_id=result.get("new_plan_id"),
+            achievement_title=result.get("achievement_title"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка перехода на следующий уровень: {str(e)}")
 
 
 @router.post("/me/generate", response_model=PlanGenerationResponse)

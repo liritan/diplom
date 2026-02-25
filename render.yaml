@@ -1,0 +1,41 @@
+databases:
+  - name: softskills-db
+    databaseName: softskills_db
+    user: softskills_user
+
+services:
+  - type: web
+    name: softskills-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: softskills-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CREATE_TABLES_ON_STARTUP
+        value: "true"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: YANDEX_API_KEY
+        sync: false
+      - key: YANDEX_FOLDER_ID
+        sync: false
+
+  - type: web
+    name: softskills-frontend
+    env: node
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- -p $PORT
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false

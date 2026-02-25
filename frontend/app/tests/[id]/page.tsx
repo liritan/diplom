@@ -72,6 +72,11 @@ function stableStringify(obj: any) {
   return JSON.stringify(sorted);
 }
 
+function sanitizeFinalLabel(value: string) {
+  const cleaned = String(value || "").replace(/\[FINAL\]/gi, "").trim();
+  return cleaned.replace(/\s{2,}/g, " ");
+}
+
 export default function TestDetailsPage() {
   const params = useParams() as any;
   const testId = Number(params?.id);
@@ -202,8 +207,8 @@ export default function TestDetailsPage() {
           ) : test ? (
             <>
               <Card className="bg-white border border-beige-300 shadow-sm rounded-xl p-6">
-                <div className="text-lg font-bold text-brown-800">{test.title}</div>
-                <div className="text-brown-600 text-sm mt-2">{test.description}</div>
+                <div className="text-lg font-bold text-brown-800">{sanitizeFinalLabel(test.title)}</div>
+                <div className="text-brown-600 text-sm mt-2">{sanitizeFinalLabel(test.description)}</div>
               </Card>
 
               {isCaseType(test.type) ? (

@@ -7,23 +7,19 @@ import api from "@/lib/api";
 import { Card } from "@/components/ui/common";
 import { SimulationChat } from "@/components/SimulationChat";
 
+type Question = {
+  id: number;
+  text: string;
+  type: string;
+};
+
 type Test = {
   id: number;
   title: string;
   description: string;
   type: string;
+  questions?: Question[];
 };
-
-const FINAL_SIMULATION_SUBTITLE =
-  "Финальная ролевая игра блока: комплексная проверка soft skills.";
-
-const FINAL_SIMULATION_INTRO =
-  "Ситуация: вы руководите мини-проектом, и за два дня до дедлайна появляется сразу несколько проблем. " +
-  "Один сотрудник срывает срок и защищается в резкой форме, второй перегружен и молчит о рисках, " +
-  "а заказчик требует подтвердить финальную дату без переноса. " +
-  "Ваша задача в диалоге: спокойно выстроить коммуникацию, показать эмоциональную устойчивость и эмпатию, " +
-  "структурно проанализировать риски, расставить приоритеты по времени и предложить лидерский план действий. " +
-  "Нужно договориться о конкретных шагах, сроках и ответственности каждого участника.";
 
 function sanitizeFinalLabel(value: string) {
   const cleaned = String(value || "").replace(/\[FINAL\]/gi, "").trim();
@@ -52,6 +48,16 @@ function apiErrorMessage(error: unknown, fallback: string) {
     }
   }
   return fallback;
+}
+
+function resolveSimulationIntro(test: Test, isFinal: boolean) {
+  if (isFinal) {
+    const scenarioText = (test.questions || []).map((q) => String(q.text || "").trim()).find(Boolean);
+    if (scenarioText) {
+      return sanitizeFinalLabel(scenarioText);
+    }
+  }
+  return sanitizeFinalLabel(test.description) || "Здравствуйте! Давайте начнем симуляцию.";
 }
 
 export default function SimulationByIdPage() {
@@ -119,17 +125,17 @@ export default function SimulationByIdPage() {
 
   const title = sanitizeFinalLabel(test.title);
   const isFinal = isFinalSimulation(test);
-  const subtitle = isFinal
-    ? FINAL_SIMULATION_SUBTITLE
-    : sanitizeFinalLabel(test.description) || "Потренируйтесь в формате чата";
-  const systemIntro = isFinal
-    ? FINAL_SIMULATION_INTRO
-    : sanitizeFinalLabel(test.description) || "Здравствуйте! Давайте начнем симуляцию.";
+  const subtitle =
+    sanitizeFinalLabel(test.description) ||
+    (isFinal
+      ? "Финальная ролевая игра: комплексная проверка soft skills."
+      : "Потренируйтесь в формате чата");
+  const systemIntro = resolveSimulationIntro(test, isFinal);
 
   return (
     <AppLayout>
       <SimulationChat
-        scenario={`sim:${test.id}`}
+        scenario={`sim:${test.id}:${title}`}
         title={title}
         subtitle={subtitle}
         systemIntro={systemIntro}

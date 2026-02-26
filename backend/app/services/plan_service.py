@@ -31,40 +31,40 @@ class PlanService:
     def _skill_keywords(self) -> Dict[str, List[str]]:
         return {
             "communication": [
-                "коммуник",
-                "общен",
-                "переговор",
-                "диалог",
+                "Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”",
+                "Р С•Р В±РЎвЂ°Р ВµР Р…",
+                "Р С—Р ВµРЎР‚Р ВµР С–Р С•Р Р†Р С•РЎР‚",
+                "Р Т‘Р С‘Р В°Р В»Р С•Р С–",
                 "communication",
                 "conversation",
             ],
             "emotional_intelligence": [
-                "эмоцион",
-                "эмпат",
+                "РЎРЊР СР С•РЎвЂ Р С‘Р С•Р Р…",
+                "РЎРЊР СР С—Р В°РЎвЂљ",
                 "emotional",
                 "intelligence",
                 "ei",
             ],
             "critical_thinking": [
-                "крит",
-                "мышлен",
-                "логик",
-                "аргумент",
+                "Р С”РЎР‚Р С‘РЎвЂљ",
+                "Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…",
+                "Р В»Р С•Р С–Р С‘Р С”",
+                "Р В°РЎР‚Р С–РЎС“Р СР ВµР Р…РЎвЂљ",
                 "critical",
                 "thinking",
             ],
             "time_management": [
-                "тайм",
-                "времен",
-                "дедлайн",
-                "приоритет",
+                "РЎвЂљР В°Р в„–Р С",
+                "Р Р†РЎР‚Р ВµР СР ВµР Р…",
+                "Р Т‘Р ВµР Т‘Р В»Р В°Р в„–Р Р…",
+                "Р С—РЎР‚Р С‘Р С•РЎР‚Р С‘РЎвЂљР ВµРЎвЂљ",
                 "time",
                 "management",
             ],
             "leadership": [
-                "лидер",
-                "команд",
-                "влияни",
+                "Р В»Р С‘Р Т‘Р ВµРЎР‚",
+                "Р С”Р С•Р СР В°Р Р…Р Т‘",
+                "Р Р†Р В»Р С‘РЎРЏР Р…Р С‘",
                 "leadership",
                 "lead",
             ],
@@ -78,33 +78,275 @@ class PlanService:
         cleaned = text.replace("[FINAL]", "").replace("[final]", "").strip()
         return " ".join(cleaned.split())
 
+    def _normalize_difficulty(self, value: Any) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized == "advanced":
+            return "advanced"
+        if normalized == "intermediate":
+            return "intermediate"
+        return "beginner"
+
     def _final_test_title(self, target_difficulty: str) -> str:
-        return f"Итоговый тест ({target_difficulty})"
+        normalized = self._normalize_difficulty(target_difficulty)
+        return f"РС‚РѕРіРѕРІС‹Р№ С‚РµСЃС‚ ({normalized})"
 
     def _legacy_final_test_title(self, target_difficulty: str) -> str:
-        return f"[FINAL] Итоговый тест ({target_difficulty})"
+        normalized = self._normalize_difficulty(target_difficulty)
+        return f"[FINAL] РС‚РѕРіРѕРІС‹Р№ С‚РµСЃС‚ ({normalized})"
 
     def _final_simulation_title(self, target_difficulty: str) -> str:
-        return f"Итоговая ролевая игра ({target_difficulty})"
+        normalized = self._normalize_difficulty(target_difficulty)
+        return f"РС‚РѕРіРѕРІР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° ({normalized})"
 
     def _legacy_final_simulation_title(self, target_difficulty: str) -> str:
-        return f"[FINAL] Итоговая ролевая игра ({target_difficulty})"
+        normalized = self._normalize_difficulty(target_difficulty)
+        return f"[FINAL] РС‚РѕРіРѕРІР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° ({normalized})"
 
-    def _final_simulation_description(self) -> str:
-        return "Финальная ролевая игра блока: комплексная проверка soft skills."
+    def _final_test_description(self, target_difficulty: str) -> str:
+        normalized = self._normalize_difficulty(target_difficulty)
+        if normalized == "advanced":
+            return "Р¤РёРЅР°Р»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° СѓСЂРѕРІРЅСЏ advanced: СЃР»РѕР¶РЅС‹Рµ СѓРїСЂР°РІР»РµРЅС‡РµСЃРєРёРµ СЂРµС€РµРЅРёСЏ, РєРѕРЅС„Р»РёРєС‚ РёРЅС‚РµСЂРµСЃРѕРІ Рё Р»РёРґРµСЂСЃС‚РІРѕ РІ СѓСЃР»РѕРІРёСЏС… РґР°РІР»РµРЅРёСЏ."
+        if normalized == "intermediate":
+            return "Р¤РёРЅР°Р»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° СѓСЂРѕРІРЅСЏ intermediate: РєРѕРѕСЂРґРёРЅР°С†РёСЏ РєРѕРјР°РЅРґС‹, РїСЂРёРѕСЂРёС‚РёР·Р°С†РёСЏ Рё РєРѕРјРјСѓРЅРёРєР°С†РёСЏ СЃ РЅРµСЃРєРѕР»СЊРєРёРјРё СЃС‚РѕСЂРѕРЅР°РјРё."
+        return "Р¤РёРЅР°Р»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° СѓСЂРѕРІРЅСЏ beginner: Р±Р°Р·РѕРІР°СЏ РєРѕРјРјСѓРЅРёРєР°С†РёСЏ, СЌРјРїР°С‚РёСЏ Рё РїР»Р°РЅРёСЂРѕРІР°РЅРёРµ РІ СЂР°Р±РѕС‡РёС… СЃРёС‚СѓР°С†РёСЏС…."
 
-    def _final_test_description(self) -> str:
-        return "Комплексная проверка по всем зонам роста текущего блока."
+    def _final_test_questions(self, target_difficulty: str) -> List[Dict[str, Any]]:
+        normalized = self._normalize_difficulty(target_difficulty)
+        if normalized == "advanced":
+            return [
+                {
+                    "text": "РќР° РїСЂРѕРµРєС‚Рµ РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ: РєРѕРЅС„Р»РёРєС‚ РІ РєРѕРјР°РЅРґРµ, СЂРёСЃРє СЃСЂС‹РІР° РґРµРґР»Р°Р№РЅР° Рё Р·Р°РїСЂРѕСЃ РєР»РёРµРЅС‚Р° РЅР° СЂР°СЃС€РёСЂРµРЅРёРµ РѕР±СЉС‘РјР°. РљР°РєРѕР№ РїРµСЂРІС‹Р№ СѓРїСЂР°РІР»РµРЅС‡РµСЃРєРёР№ С€Р°Рі РЅР°РёР±РѕР»РµРµ СЃРёР»СЊРЅС‹Р№?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "Р—Р°С„РёРєСЃРёСЂРѕРІР°С‚СЊ СЂРёСЃРєРё, РїСЂРѕРІРµСЃС‚Рё РєРѕСЂРѕС‚РєСѓСЋ Р°РЅС‚РёРєСЂРёР·РёСЃРЅСѓСЋ РІСЃС‚СЂРµС‡Сѓ Рё СЃРѕРіР»Р°СЃРѕРІР°С‚СЊ РїР»Р°РЅ СЃ РѕС‚РІРµС‚СЃС‚РІРµРЅРЅС‹РјРё"},
+                        {"text": "РЎСЂР°Р·Сѓ РїРѕРѕР±РµС‰Р°С‚СЊ РєР»РёРµРЅС‚Сѓ РІСЃС‘ РІС‹РїРѕР»РЅРёС‚СЊ Р±РµР· РїРµСЂРµСЃРјРѕС‚СЂР° СЃСЂРѕРєРѕРІ"},
+                        {"text": "РџРµСЂРµРґР°С‚СЊ РїСЂРѕР±Р»РµРјСѓ СЂСѓРєРѕРІРѕРґСЃС‚РІСѓ Рё Р¶РґР°С‚СЊ СЂРµС€РµРЅРёСЏ"},
+                    ],
+                },
+                {
+                    "text": "РљРѕРјР°РЅРґР° СЌРјРѕС†РёРѕРЅР°Р»СЊРЅРѕ РІС‹РіРѕСЂРµР»Р°, Р° Р±РёР·РЅРµСЃ РґР°РІРёС‚ РЅР° СЃРєРѕСЂРѕСЃС‚СЊ. Р§С‚Рѕ Р»СѓС‡С€Рµ РѕС‚СЂР°Р¶Р°РµС‚ Р·СЂРµР»РѕРµ Р»РёРґРµСЂСЃС‚РІРѕ?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "РЎР±Р°Р»Р°РЅСЃРёСЂРѕРІР°С‚СЊ РЅР°РіСЂСѓР·РєСѓ, РїСЂРѕСЏСЃРЅРёС‚СЊ РїСЂРёРѕСЂРёС‚РµС‚С‹ Рё РѕР±РµСЃРїРµС‡РёС‚СЊ РєРѕСЂРѕС‚РєРёРµ С†РёРєР»С‹ РѕР±СЂР°С‚РЅРѕР№ СЃРІСЏР·Рё"},
+                        {"text": "РџРѕРІС‹СЃРёС‚СЊ РєРѕРЅС‚СЂРѕР»СЊ Рё РѕС‚РјРµРЅРёС‚СЊ РѕР±СЃСѓР¶РґРµРЅРёСЏ, С‡С‚РѕР±С‹ РЅРµ С‚СЂР°С‚РёС‚СЊ РІСЂРµРјСЏ"},
+                        {"text": "РЎРєРѕРЅС†РµРЅС‚СЂРёСЂРѕРІР°С‚СЊСЃСЏ С‚РѕР»СЊРєРѕ РЅР° KPI, РёРіРЅРѕСЂРёСЂСѓСЏ СЌРјРѕС†РёРѕРЅР°Р»СЊРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ"},
+                    ],
+                },
+                {
+                    "text": "Р”РІР° СЃС‚РµР№РєС…РѕР»РґРµСЂР° С‚СЂРµР±СѓСЋС‚ РІР·Р°РёРјРѕРёСЃРєР»СЋС‡Р°СЋС‰РёРµ СЂРµС€РµРЅРёСЏ. РљР°Рє РґРµР№СЃС‚РІРѕРІР°С‚СЊ?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "РЎРѕР±СЂР°С‚СЊ РєСЂРёС‚РµСЂРёРё СѓСЃРїРµС…Р°, РѕС†РµРЅРёС‚СЊ РєРѕРјРїСЂРѕРјРёСЃСЃС‹ Рё РїСЂРµРґР»РѕР¶РёС‚СЊ РїСЂРѕР·СЂР°С‡РЅС‹Р№ РІР°СЂРёР°РЅС‚ СЃ РїРѕСЃР»РµРґСЃС‚РІРёСЏРјРё"},
+                        {"text": "РџРѕРґРґРµСЂР¶Р°С‚СЊ С‚РѕРіРѕ, РєС‚Рѕ Р·Р°РЅРёРјР°РµС‚ Р±РѕР»РµРµ РІС‹СЃРѕРєСѓСЋ РґРѕР»Р¶РЅРѕСЃС‚СЊ"},
+                        {"text": "РћС‚Р»РѕР¶РёС‚СЊ СЂРµС€РµРЅРёРµ РґРѕ РїРѕСЃР»РµРґРЅРµРіРѕ РґРЅСЏ"},
+                    ],
+                },
+                {
+                    "text": "РљР°РєРѕР№ РїРѕРґС…РѕРґ Р»СѓС‡С€Рµ РІСЃРµРіРѕ РїРѕРєР°Р·С‹РІР°РµС‚ РєСЂРёС‚РёС‡РµСЃРєРѕРµ РјС‹С€Р»РµРЅРёРµ РІ СѓРїСЂР°РІР»РµРЅС‡РµСЃРєРѕР№ Р·Р°РґР°С‡Рµ?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "РџСЂРѕРІРµСЂРёС‚СЊ РёСЃС…РѕРґРЅС‹Рµ РґРѕРїСѓС‰РµРЅРёСЏ, РґР°РЅРЅС‹Рµ Рё Р°Р»СЊС‚РµСЂРЅР°С‚РёРІС‹ РїРµСЂРµРґ СЂРµС€РµРЅРёРµРј"},
+                        {"text": "РћРїРёСЂР°СЏСЃСЊ РЅР° РѕРїС‹С‚, СЃСЂР°Р·Сѓ РІС‹Р±СЂР°С‚СЊ Р·РЅР°РєРѕРјС‹Р№ РІР°СЂРёР°РЅС‚"},
+                        {"text": "РЎРґРµР»Р°С‚СЊ РІС‹Р±РѕСЂ РїРѕ РЅР°СЃС‚СЂРѕРµРЅРёСЋ РєРѕРјР°РЅРґС‹"},
+                    ],
+                },
+            ]
+        if normalized == "intermediate":
+            return [
+                {
+                    "text": "РќР° РµР¶РµРЅРµРґРµР»СЊРЅРѕР№ РІСЃС‚СЂРµС‡Рµ РІРѕР·РЅРёРє СЃРїРѕСЂ РјРµР¶РґСѓ РґРІСѓРјСЏ РєРѕР»Р»РµРіР°РјРё, СЃСЂРѕРєРё РїРѕРґ СѓРіСЂРѕР·РѕР№. Р’Р°С€ РїРµСЂРІС‹Р№ С€Р°Рі?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "РћСЃС‚Р°РЅРѕРІРёС‚СЊ СЃРїРѕСЂ, СѓС‚РѕС‡РЅРёС‚СЊ С„Р°РєС‚С‹ Рё РґРѕРіРѕРІРѕСЂРёС‚СЊСЃСЏ Рѕ СЃР»РµРґСѓСЋС‰РёС… РґРµР№СЃС‚РІРёСЏС… РїРѕ СЃСЂРѕРєР°Рј"},
+                        {"text": "Р’С‹Р±СЂР°С‚СЊ РѕРґРЅСѓ СЃС‚РѕСЂРѕРЅСѓ Р±РµР· РѕР±СЃСѓР¶РґРµРЅРёСЏ"},
+                        {"text": "РџРµСЂРµРЅРµСЃС‚Рё СЂРµС€РµРЅРёРµ РЅР° СЃР»РµРґСѓСЋС‰СѓСЋ РЅРµРґРµР»СЋ"},
+                    ],
+                },
+                {
+                    "text": "РљР»РёРµРЅС‚ РїСЂРѕСЃРёС‚ СЃСЂРѕС‡РЅСѓСЋ РґРѕСЂР°Р±РѕС‚РєСѓ, РєРѕРјР°РЅРґР° СѓР¶Рµ РїРµСЂРµРіСЂСѓР¶РµРЅР°. РљР°Рє РєРѕСЂСЂРµРєС‚РЅРѕ РѕС‚РІРµС‚РёС‚СЊ?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "РЈС‚РѕС‡РЅРёС‚СЊ РїСЂРёРѕСЂРёС‚РµС‚, РїРѕРєР°Р·Р°С‚СЊ РІР»РёСЏРЅРёРµ РЅР° С‚РµРєСѓС‰РёР№ РїР»Р°РЅ Рё РїСЂРµРґР»РѕР¶РёС‚СЊ РІР°СЂРёР°РЅС‚С‹"},
+                        {"text": "РЎСЂР°Р·Сѓ СЃРѕРіР»Р°СЃРёС‚СЊСЃСЏ Р±РµР· РїРµСЂРµСЃРјРѕС‚СЂР° РїР»Р°РЅР°"},
+                        {"text": "РћС‚РєР°Р·Р°С‚СЊ Р±РµР· РѕР±СЉСЏСЃРЅРµРЅРёР№"},
+                    ],
+                },
+                {
+                    "text": "Р’С‹ РІРµРґС‘С‚Рµ РґРІРµ РїР°СЂР°Р»Р»РµР»СЊРЅС‹Рµ Р·Р°РґР°С‡Рё СЃ Р±Р»РёР·РєРёРјРё РґРµРґР»Р°Р№РЅР°РјРё. Р§С‚Рѕ СЌС„С„РµРєС‚РёРІРЅРµРµ?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "Р Р°Р·Р±РёС‚СЊ Р·Р°РґР°С‡Рё РЅР° СЌС‚Р°РїС‹, РЅР°Р·РЅР°С‡РёС‚СЊ РїСЂРёРѕСЂРёС‚РµС‚С‹ Рё РєРѕРЅС‚СЂРѕР»СЊРЅС‹Рµ С‚РѕС‡РєРё"},
+                        {"text": "Р Р°Р±РѕС‚Р°С‚СЊ С‚РѕР»СЊРєРѕ РЅР°Рґ Р±РѕР»РµРµ РёРЅС‚РµСЂРµСЃРЅРѕР№ Р·Р°РґР°С‡РµР№"},
+                        {"text": "Р–РґР°С‚СЊ, РїРѕРєР° РєС‚Рѕ-С‚Рѕ РѕРїСЂРµРґРµР»РёС‚ РїСЂРёРѕСЂРёС‚РµС‚ Р·Р° РІР°СЃ"},
+                    ],
+                },
+                {
+                    "text": "РЎРѕС‚СЂСѓРґРЅРёРє РІ РЅР°РїСЂСЏР¶РµРЅРёРё Рё РѕС‚РІРµС‡Р°РµС‚ СЂРµР·РєРѕ. РљР°Рє Р»СѓС‡С€Рµ РѕС‚СЂРµР°РіРёСЂРѕРІР°С‚СЊ?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"text": "РЎРѕС…СЂР°РЅСЏС‚СЊ СЃРїРѕРєРѕР№СЃС‚РІРёРµ, РїСЂРёР·РЅР°С‚СЊ СЌРјРѕС†РёРё Рё РІРµСЂРЅСѓС‚СЊ СЂР°Р·РіРѕРІРѕСЂ Рє С„Р°РєС‚Р°Рј"},
+                        {"text": "РћС‚РІРµС‚РёС‚СЊ РІ С‚РѕРј Р¶Рµ С‚РѕРЅРµ"},
+                        {"text": "РџСЂРµСЂРІР°С‚СЊ РѕР±С‰РµРЅРёРµ РґРѕ РєРѕРЅС†Р° РґРЅСЏ"},
+                    ],
+                },
+            ]
+        return [
+            {
+                "text": "РљРѕР»Р»РµРіР° РЅРµ РїРѕРЅСЏР» Р·Р°РґР°С‡Сѓ Рё Р·Р°РјРµС‚РЅРѕ СЂР°Р·РґСЂР°Р¶С‘РЅ. Р’Р°С€ СЃР°РјС‹Р№ РїРѕР»РµР·РЅС‹Р№ РїРµСЂРІС‹Р№ С€Р°Рі?",
+                "type": "multiple_choice",
+                "options": [
+                    {"text": "РЎРїРѕРєРѕР№РЅРѕ СѓС‚РѕС‡РЅРёС‚СЊ С†РµР»СЊ Рё РїРµСЂРµС„РѕСЂРјСѓР»РёСЂРѕРІР°С‚СЊ Р·Р°РґР°С‡Сѓ РїСЂРѕСЃС‚С‹РјРё С€Р°РіР°РјРё"},
+                    {"text": "РЎСЂР°Р·Сѓ РїРµСЂРµРґР°С‚СЊ Р·Р°РґР°С‡Сѓ РґСЂСѓРіРѕРјСѓ С‡РµР»РѕРІРµРєСѓ"},
+                    {"text": "РРіРЅРѕСЂРёСЂРѕРІР°С‚СЊ СЌРјРѕС†РёРё Рё С‚СЂРµР±РѕРІР°С‚СЊ Р±С‹СЃС‚СЂС‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚"},
+                ],
+            },
+            {
+                "text": "РљР°Рє Р»СѓС‡С€Рµ СЂР°СЃРїСЂРµРґРµР»РёС‚СЊ СЂР°Р±РѕС‡РёРµ Р·Р°РґР°С‡Рё РЅР° РґРµРЅСЊ?",
+                "type": "multiple_choice",
+                "options": [
+                    {"text": "РћРїСЂРµРґРµР»РёС‚СЊ РїСЂРёРѕСЂРёС‚РµС‚С‹ Рё РѕС†РµРЅРёС‚СЊ РІСЂРµРјСЏ РЅР° РєР°Р¶РґСѓСЋ Р·Р°РґР°С‡Сѓ"},
+                    {"text": "РќР°С‡РёРЅР°С‚СЊ С‚РѕР»СЊРєРѕ СЃ СЃР°РјС‹С… Р»С‘РіРєРёС… Р·Р°РґР°С‡"},
+                    {"text": "Р”РµР»Р°С‚СЊ Р·Р°РґР°С‡Рё РІ СЃР»СѓС‡Р°Р№РЅРѕРј РїРѕСЂСЏРґРєРµ"},
+                ],
+            },
+            {
+                "text": "РљР»РёРµРЅС‚ РїСЂРѕСЃРёС‚ РІРЅРµСЃС‚Рё РёР·РјРµРЅРµРЅРёСЏ РІ РїРѕСЃР»РµРґРЅРёР№ РјРѕРјРµРЅС‚. РљР°Рє РґРµР№СЃС‚РІРѕРІР°С‚СЊ?",
+                "type": "multiple_choice",
+                "options": [
+                    {"text": "РЈС‚РѕС‡РЅРёС‚СЊ С‚СЂРµР±РѕРІР°РЅРёСЏ, РІР»РёСЏРЅРёРµ РЅР° СЃСЂРѕРєРё Рё СЃРѕРіР»Р°СЃРѕРІР°С‚СЊ СЂРµР°Р»РёСЃС‚РёС‡РЅС‹Р№ РІР°СЂРёР°РЅС‚"},
+                    {"text": "РЎСЂР°Р·Сѓ СЃРѕРіР»Р°СЃРёС‚СЊСЃСЏ Р±РµР· СѓС‚РѕС‡РЅРµРЅРёР№"},
+                    {"text": "РЎСЂР°Р·Сѓ РѕС‚РєР°Р·Р°С‚СЊСЃСЏ Р±РµР· РѕР±СЃСѓР¶РґРµРЅРёСЏ"},
+                ],
+            },
+            {
+                "text": "Р’ РєРѕРјР°РЅРґРµ РІРѕР·РЅРёРєР»Рѕ РЅР°РїСЂСЏР¶РµРЅРёРµ. Р§С‚Рѕ РїРѕРјРѕРіР°РµС‚ СЃРЅРёР·РёС‚СЊ РєРѕРЅС„Р»РёРєС‚?",
+                "type": "multiple_choice",
+                "options": [
+                    {"text": "Р’С‹СЃР»СѓС€Р°С‚СЊ РѕР±Рµ СЃС‚РѕСЂРѕРЅС‹ Рё Р·Р°С„РёРєСЃРёСЂРѕРІР°С‚СЊ РґРѕРіРѕРІРѕСЂС‘РЅРЅРѕСЃС‚Рё"},
+                    {"text": "РќР°Р·РЅР°С‡РёС‚СЊ РІРёРЅРѕРІРЅРѕРіРѕ Р±РµР· СЂР°Р·Р±РѕСЂР° СЃРёС‚СѓР°С†РёРё"},
+                    {"text": "РЎРґРµР»Р°С‚СЊ РІРёРґ, С‡С‚Рѕ РїСЂРѕР±Р»РµРјС‹ РЅРµС‚"},
+                ],
+            },
+        ]
 
-    def _final_simulation_intro(self) -> str:
+    def _final_simulation_description(self, target_difficulty: str) -> str:
+        normalized = self._normalize_difficulty(target_difficulty)
+        if normalized == "advanced":
+            return "Р¤РёРЅР°Р»СЊРЅР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° СѓСЂРѕРІРЅСЏ advanced: СЃС‚СЂРµСЃСЃРѕРІР°СЏ СЃРёС‚СѓР°С†РёСЏ СЃ РєРѕРЅС„Р»РёРєС‚РѕРј РёРЅС‚РµСЂРµСЃРѕРІ, Р»РёРґРµСЂСЃС‚РІРѕРј Рё РїСЂРёРЅСЏС‚РёРµРј СЂРµС€РµРЅРёР№ РІ СѓСЃР»РѕРІРёСЏС… РІС‹СЃРѕРєРѕР№ РЅРµРѕРїСЂРµРґРµР»С‘РЅРЅРѕСЃС‚Рё."
+        if normalized == "intermediate":
+            return "Р¤РёРЅР°Р»СЊРЅР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° СѓСЂРѕРІРЅСЏ intermediate: СѓРїСЂР°РІР»РµРЅРёРµ РєРѕРјРјСѓРЅРёРєР°С†РёРµР№ РјРµР¶РґСѓ РєРѕРјР°РЅРґРѕР№ Рё Р·Р°РєР°Р·С‡РёРєРѕРј РїСЂРё СЂРёСЃРєРµ СЃСЂС‹РІР° СЃСЂРѕРєРѕРІ."
+        return "Р¤РёРЅР°Р»СЊРЅР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° СѓСЂРѕРІРЅСЏ beginner: РїСЂРѕРІРµСЂРєР° Р±Р°Р·РѕРІРѕР№ РєРѕРјРјСѓРЅРёРєР°С†РёРё, СЌРјРїР°С‚РёРё Рё С‚Р°Р№Рј-РјРµРЅРµРґР¶РјРµРЅС‚Р° РІ СЂР°Р±РѕС‡РµРј РґРёР°Р»РѕРіРµ."
+
+    def _final_simulation_intro(self, target_difficulty: str) -> str:
+        normalized = self._normalize_difficulty(target_difficulty)
+        if normalized == "advanced":
+            return (
+                "РЎРёС‚СѓР°С†РёСЏ: РІС‹ СЂСѓРєРѕРІРѕРґРёС‚Рµ РєСЂРѕСЃСЃ-С„СѓРЅРєС†РёРѕРЅР°Р»СЊРЅС‹Рј РїСЂРѕРµРєС‚РѕРј, РєРѕС‚РѕСЂС‹Р№ РґРѕР»Р¶РµРЅ РІС‹Р№С‚Рё РІ СЂРµР»РёР· С‡РµСЂРµР· 48 С‡Р°СЃРѕРІ. "
+                "РўРµС…РЅРёС‡РµСЃРєРёР№ Р»РёРґРµСЂ СЃРѕРѕР±С‰Р°РµС‚ Рѕ РєСЂРёС‚РёС‡РµСЃРєРѕРј СЂРёСЃРєРµ РІ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё, РєРѕРјРјРµСЂС‡РµСЃРєРёР№ РґРёСЂРµРєС‚РѕСЂ С‚СЂРµР±СѓРµС‚ РЅРµ РїРµСЂРµРЅРѕСЃРёС‚СЊ РґР°С‚Сѓ Р·Р°РїСѓСЃРєР°, "
+                "Р° РєР»СЋС‡РµРІРѕР№ РєР»РёРµРЅС‚ РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ РїСЂРѕСЃРёС‚ РґРѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Р№ С„СѓРЅРєС†РёРѕРЅР°Р» РІ СЂРµР»РёР·. "
+                "Р’РЅСѓС‚СЂРё РєРѕРјР°РЅРґС‹ РЅР°С‡Р°Р»РѕСЃСЊ РЅР°РїСЂСЏР¶РµРЅРёРµ: С‡Р°СЃС‚СЊ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ РЅР°СЃС‚Р°РёРІР°РµС‚ РЅР° РЅРµРјРµРґР»РµРЅРЅРѕРј Р·Р°РјРѕСЂР°Р¶РёРІР°РЅРёРё РёР·РјРµРЅРµРЅРёР№, "
+                "С‡Р°СЃС‚СЊ Р±РѕРёС‚СЃСЏ РїРѕС‚РµСЂСЏС‚СЊ РєР»РёРµРЅС‚Р° РёР·-Р·Р° РѕС‚РєР°Р·Р°. "
+                "Р’Р°С€Р° Р·Р°РґР°С‡Р° РІ РґРёР°Р»РѕРіРµ: СѓРґРµСЂР¶Р°С‚СЊ РєРѕРЅСЃС‚СЂСѓРєС‚РёРІРЅСѓСЋ РєРѕРјРјСѓРЅРёРєР°С†РёСЋ, РїСЂРѕСЏРІРёС‚СЊ СЌРјРѕС†РёРѕРЅР°Р»СЊРЅСѓСЋ СѓСЃС‚РѕР№С‡РёРІРѕСЃС‚СЊ Рё СЌРјРїР°С‚РёСЋ, "
+                "СЃРѕР±СЂР°С‚СЊ С„Р°РєС‚С‹, РѕС†РµРЅРёС‚СЊ СЂРёСЃРєРё Рё РїСЂРµРґР»РѕР¶РёС‚СЊ Р»РёРґРµСЂСЃРєРёР№ РїР»Р°РЅ РґРµР№СЃС‚РІРёР№ СЃ РїРѕРЅСЏС‚РЅС‹РјРё СЃСЂРѕРєР°РјРё, РѕС‚РІРµС‚СЃС‚РІРµРЅРЅС‹РјРё Рё РєСЂРёС‚РµСЂРёСЏРјРё РїСЂРёРЅСЏС‚РёСЏ СЂРµС€РµРЅРёСЏ."
+            )
+        if normalized == "intermediate":
+            return (
+                "РЎРёС‚СѓР°С†РёСЏ: РІС‹ РєРѕРѕСЂРґРёРЅРёСЂСѓРµС‚Рµ СЂР°Р±РѕС‡СѓСЋ РіСЂСѓРїРїСѓ, Рё Р·Р° РґРІР° РґРЅСЏ РґРѕ РґРµРґР»Р°Р№РЅР° РІС‹СЏСЃРЅСЏРµС‚СЃСЏ, С‡С‚Рѕ РѕРґРЅР° РёР· РєР»СЋС‡РµРІС‹С… Р·Р°РґР°С‡ РѕС‚СЃС‚Р°С‘С‚. "
+                "РћРґРёРЅ СЃРѕС‚СЂСѓРґРЅРёРє СЂР°Р·РґСЂР°Р¶С‘РЅ Рё СЃС‡РёС‚Р°РµС‚, С‡С‚Рѕ РµРјСѓ РґР°Р»Рё СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№ РѕР±СЉС‘Рј, РІС‚РѕСЂРѕР№ РјРѕР»С‡РёС‚ Рѕ СЂРёСЃРєР°С…, "
+                "Р° Р·Р°РєР°Р·С‡РёРє РїСЂРѕСЃРёС‚ РїРѕРґС‚РІРµСЂРґРёС‚СЊ С„РёРЅР°Р»СЊРЅС‹Р№ СЃСЂРѕРє Р±РµР· РїРµСЂРµРЅРѕСЃР°. "
+                "Р’Р°С€Р° Р·Р°РґР°С‡Р° РІ РґРёР°Р»РѕРіРµ: СЃРїРѕРєРѕР№РЅРѕ РІС‹СЃС‚СЂРѕРёС‚СЊ РѕР±С‰РµРЅРёРµ, СѓС‚РѕС‡РЅРёС‚СЊ РїСЂРёС‡РёРЅС‹ Р·Р°РґРµСЂР¶РєРё, СЂР°СЃСЃС‚Р°РІРёС‚СЊ РїСЂРёРѕСЂРёС‚РµС‚С‹, "
+                "СЃРѕРіР»Р°СЃРѕРІР°С‚СЊ СЂРµР°Р»РёСЃС‚РёС‡РЅС‹Р№ РїР»Р°РЅ Рё РґРѕРіРѕРІРѕСЂРёС‚СЊСЃСЏ СЃ СѓС‡Р°СЃС‚РЅРёРєР°РјРё Рѕ РєРѕРЅРєСЂРµС‚РЅС‹С… С€Р°РіР°С… Рё РѕС‚РІРµС‚СЃС‚РІРµРЅРЅРѕСЃС‚Рё."
+            )
         return (
-            "Ситуация: вы руководите мини-проектом, и за два дня до дедлайна появляется сразу несколько проблем. "
-            "Один сотрудник срывает срок и защищается в резкой форме, второй перегружен и молчит о рисках, "
-            "а заказчик требует подтвердить финальную дату без переноса. "
-            "Ваша задача в диалоге: спокойно выстроить коммуникацию, показать эмоциональную устойчивость и эмпатию, "
-            "структурно проанализировать риски, расставить приоритеты по времени и предложить лидерский план действий. "
-            "Нужно договориться о конкретных шагах, сроках и ответственности каждого участника."
+            "РЎРёС‚СѓР°С†РёСЏ: РІС‹ РѕС‚РІРµС‡Р°РµС‚Рµ Р·Р° РЅРµР±РѕР»СЊС€РѕР№ СЂР°Р±РѕС‡РёР№ Р±Р»РѕРє РІ РєРѕРјР°РЅРґРµ. "
+            "РџРµСЂРµРґ РґРµРґР»Р°Р№РЅРѕРј РІС‹СЏСЃРЅРёР»РѕСЃСЊ, С‡С‚Рѕ РєРѕР»Р»РµРіР° РЅРµ РґРѕ РєРѕРЅС†Р° РїРѕРЅСЏР» Р·Р°РґР°С‡Сѓ Рё РЅРµСЂРІРЅРёС‡Р°РµС‚, "
+            "Р° РєР»РёРµРЅС‚ РѕР¶РёРґР°РµС‚ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚Р° РІ СЃСЂРѕРє. "
+            "Р’Р°С€Р° Р·Р°РґР°С‡Р° РІ РґРёР°Р»РѕРіРµ: РїРѕРґРґРµСЂР¶Р°С‚СЊ РєРѕРЅСЃС‚СЂСѓРєС‚РёРІРЅС‹Р№ С‚РѕРЅ, РїСЂРѕСЏРІРёС‚СЊ СЌРјРїР°С‚РёСЋ, "
+            "РїСЂРѕСЃС‚С‹РјРё СЃР»РѕРІР°РјРё СѓС‚РѕС‡РЅРёС‚СЊ РїСЂРёРѕСЂРёС‚РµС‚С‹ Рё РґРѕРіРѕРІРѕСЂРёС‚СЊСЃСЏ Рѕ РїРѕРЅСЏС‚РЅРѕРј РїР»Р°РЅРµ РґРµР№СЃС‚РІРёР№, С‡С‚РѕР±С‹ РєРѕРјР°РЅРґР° СѓСЃРїРµР»Р° РІРѕРІСЂРµРјСЏ."
         )
+
+    def _normalize_question_payload(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        text = str(payload.get("text") or "").strip()
+        if not text:
+            return None
+
+        question_type = str(payload.get("type") or "text").strip().lower() or "text"
+        options_raw = payload.get("options")
+        options: Optional[List[Dict[str, Any]]] = None
+        if isinstance(options_raw, list):
+            normalized_options: List[Dict[str, Any]] = []
+            for option in options_raw:
+                if isinstance(option, dict):
+                    option_text = str(
+                        option.get("text")
+                        or option.get("label")
+                        or option.get("value")
+                        or ""
+                    ).strip()
+                else:
+                    option_text = str(option or "").strip()
+                if option_text:
+                    normalized_options.append({"text": option_text})
+            if normalized_options:
+                options = normalized_options
+
+        return {
+            "text": text,
+            "type": question_type,
+            "options": options,
+        }
+
+    async def _sync_test_questions(
+        self,
+        test_id: int,
+        expected_questions: List[Dict[str, Any]],
+        db: AsyncSession,
+    ) -> None:
+        normalized_expected: List[Dict[str, Any]] = []
+        for item in expected_questions:
+            if not isinstance(item, dict):
+                continue
+            normalized = self._normalize_question_payload(item)
+            if normalized is not None:
+                normalized_expected.append(normalized)
+
+        if not normalized_expected:
+            return
+
+        existing_res = await db.execute(
+            select(Question).where(Question.test_id == int(test_id)).order_by(Question.id.asc())
+        )
+        existing_questions = list(existing_res.scalars().all())
+        normalized_existing: List[Dict[str, Any]] = []
+        for question in existing_questions:
+            normalized = self._normalize_question_payload(
+                {
+                    "text": question.text,
+                    "type": question.type,
+                    "options": question.options,
+                }
+            )
+            if normalized is not None:
+                normalized_existing.append(normalized)
+
+        if normalized_existing == normalized_expected:
+            return
+
+        for question in existing_questions:
+            await db.delete(question)
+        await db.flush()
+
+        for question in normalized_expected:
+            db.add(
+                Question(
+                    test_id=int(test_id),
+                    text=question["text"],
+                    type=question["type"],
+                    options=question["options"],
+                    correct_answer=None,
+                )
+            )
+        await db.flush()
 
     def _is_final_title(self, value: str) -> bool:
         normalized = self._normalize_text(value)
@@ -112,8 +354,12 @@ class PlanService:
             return False
         return (
             "[final]" in normalized
-            or normalized.startswith("итоговый тест (")
-            or normalized.startswith("итоговая ролевая игра (")
+            or normalized.startswith("РёС‚РѕРіРѕРІС‹Р№ С‚РµСЃС‚ (")
+            or normalized.startswith("РёС‚РѕРіРѕРІР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° (")
+            or normalized.startswith("final test (")
+            or normalized.startswith("final simulation (")
+            or "С„РёРЅР°Р»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° СѓСЂРѕРІРЅСЏ" in normalized
+            or "С„РёРЅР°Р»СЊРЅР°СЏ СЂРѕР»РµРІР°СЏ РёРіСЂР° СѓСЂРѕРІРЅСЏ" in normalized
         )
 
     def _is_final_test(self, test: Test) -> bool:
@@ -171,14 +417,14 @@ class PlanService:
     def _difficulty_ru_label(self, difficulty: str) -> str:
         normalized = str(difficulty or "").strip().lower()
         if normalized == "advanced":
-            return "продвинутый"
+            return "Р С—РЎР‚Р С•Р Т‘Р Р†Р С‘Р Р…РЎС“РЎвЂљРЎвЂ№Р в„–"
         if normalized == "intermediate":
-            return "средний"
-        return "начальный"
+            return "РЎРѓРЎР‚Р ВµР Т‘Р Р…Р С‘Р в„–"
+        return "Р Р…Р В°РЎвЂЎР В°Р В»РЎРЉР Р…РЎвЂ№Р в„–"
 
     def _build_block_achievement_title(self, content: Dict[str, Any]) -> str:
         target = str(content.get("target_difficulty") or "beginner")
-        return f"Пройден первый {self._difficulty_ru_label(target)} блок"
+        return f"Р СџРЎР‚Р С•Р в„–Р Т‘Р ВµР Р… Р С—Р ВµРЎР‚Р Р†РЎвЂ№Р в„– {self._difficulty_ru_label(target)} Р В±Р В»Р С•Р С”"
 
     def _collect_block_achievements(self, plans: List[DevelopmentPlan]) -> List[Dict[str, Any]]:
         merged: List[Dict[str, Any]] = []
@@ -370,7 +616,8 @@ class PlanService:
         content: Dict[str, Any],
         db: AsyncSession,
     ) -> Dict[str, Any]:
-        target_difficulty = str(content.get("target_difficulty") or "beginner")
+        target_difficulty = self._normalize_difficulty(content.get("target_difficulty"))
+        content["target_difficulty"] = target_difficulty
         final_stage = content.get("final_stage")
         if not isinstance(final_stage, dict):
             final_stage = {}
@@ -404,35 +651,19 @@ class PlanService:
         if final_test is None:
             final_test = Test(
                 title=final_test_title,
-                description=self._final_test_description(),
+                description=self._final_test_description(target_difficulty),
                 type="quiz",
             )
             db.add(final_test)
             await db.flush()
         else:
             final_test.title = self._strip_final_marker(str(final_test.title or final_test_title)) or final_test_title
-            final_test.description = self._final_test_description()
-
-        questions_res = await db.execute(select(Question).where(Question.test_id == final_test.id))
-        existing_questions = list(questions_res.scalars().all())
-        if not existing_questions:
-            question_payload = [
-                "Опишите ситуацию, где вы применили коммуникацию и достигли результата.",
-                "Как вы управляете своими эмоциями в стрессовой рабочей ситуации?",
-                "Опишите пример, когда критическое мышление помогло избежать ошибки.",
-                "Как вы расставляете приоритеты при нескольких дедлайнах?",
-                "Как вы проявляете лидерство при работе в команде?",
-            ]
-            for text in question_payload:
-                db.add(
-                    Question(
-                        test_id=final_test.id,
-                        text=text,
-                        type="text",
-                        options=None,
-                        correct_answer=None,
-                    )
-                )
+            final_test.description = self._final_test_description(target_difficulty)
+        await self._sync_test_questions(
+            test_id=int(final_test.id),
+            expected_questions=self._final_test_questions(target_difficulty),
+            db=db,
+        )
 
         final_simulation = None
         final_simulation_id_raw = final_stage.get("final_simulation_id")
@@ -458,7 +689,7 @@ class PlanService:
         if final_simulation is None:
             final_simulation = Test(
                 title=final_simulation_title,
-                description=self._final_simulation_description(),
+                description=self._final_simulation_description(target_difficulty),
                 type="simulation",
             )
             db.add(final_simulation)
@@ -467,7 +698,18 @@ class PlanService:
             final_simulation.title = self._strip_final_marker(
                 str(final_simulation.title or final_simulation_title)
             ) or final_simulation_title
-            final_simulation.description = self._final_simulation_description()
+            final_simulation.description = self._final_simulation_description(target_difficulty)
+        await self._sync_test_questions(
+            test_id=int(final_simulation.id),
+            expected_questions=[
+                {
+                    "text": self._final_simulation_intro(target_difficulty),
+                    "type": "text",
+                    "options": None,
+                }
+            ],
+            db=db,
+        )
 
         final_stage["final_test_id"] = int(final_test.id)
         final_stage["final_simulation_id"] = int(final_simulation.id)
@@ -716,12 +958,12 @@ class PlanService:
     ) -> Dict[str, Any]:
         plan = await self.get_active_plan(user_id, db)
         if plan is None:
-            raise ValueError("У вас нет активного плана развития")
+            raise ValueError("Р Р€ Р Р†Р В°РЎРѓ Р Р…Р ВµРЎвЂљ Р В°Р С”РЎвЂљР С‘Р Р†Р Р…Р С•Р С–Р С• Р С—Р В»Р В°Р Р…Р В° РЎР‚Р В°Р В·Р Р†Р С‘РЎвЂљР С‘РЎРЏ")
 
         profile_res = await db.execute(select(SoftSkillsProfile).where(SoftSkillsProfile.user_id == user_id))
         profile = profile_res.scalar_one_or_none()
         if profile is None:
-            raise ValueError("Профиль не найден. Сначала пройдите тест или отправьте сообщение в чат.")
+            raise ValueError("Р СџРЎР‚Р С•РЎвЂћР С‘Р В»РЎРЉ Р Р…Р Вµ Р Р…Р В°Р в„–Р Т‘Р ВµР Р…. Р РЋР Р…Р В°РЎвЂЎР В°Р В»Р В° Р С—РЎР‚Р С•Р в„–Р Т‘Р С‘РЎвЂљР Вµ РЎвЂљР ВµРЎРѓРЎвЂљ Р С‘Р В»Р С‘ Р С•РЎвЂљР С—РЎР‚Р В°Р Р†РЎРЉРЎвЂљР Вµ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ Р Р† РЎвЂЎР В°РЎвЂљ.")
 
         tracking = await self.sync_plan_tracking(
             plan=plan,
@@ -737,9 +979,9 @@ class PlanService:
             final_stage = {}
 
         if not bool(final_stage.get("unlocked")):
-            raise ValueError("Сначала доведите прогресс плана до 100%.")
+            raise ValueError("Р РЋР Р…Р В°РЎвЂЎР В°Р В»Р В° Р Т‘Р С•Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ Р С—РЎР‚Р С•Р С–РЎР‚Р ВµРЎРѓРЎРѓ Р С—Р В»Р В°Р Р…Р В° Р Т‘Р С• 100%.")
         if not bool(final_stage.get("completed")):
-            raise ValueError("Сначала завершите оба финальных задания.")
+            raise ValueError("Р РЋР Р…Р В°РЎвЂЎР В°Р В»Р В° Р В·Р В°Р Р†Р ВµРЎР‚РЎв‚¬Р С‘РЎвЂљР Вµ Р С•Р В±Р В° РЎвЂћР С‘Р Р…Р В°Р В»РЎРЉР Р…РЎвЂ№РЎвЂ¦ Р В·Р В°Р Т‘Р В°Р Р…Р С‘РЎРЏ.")
 
         target_difficulty = str(content.get("target_difficulty") or "beginner")
         achievement_title = self._build_block_achievement_title(content)
@@ -805,175 +1047,175 @@ class PlanService:
         return [
             {
                 "id": "ru_4brain_comm_communication",
-                "title": "Эффективное общение: вербальная и невербальная коммуникация",
+                "title": "Р В­РЎвЂћРЎвЂћР ВµР С”РЎвЂљР С‘Р Р†Р Р…Р С•Р Вµ Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ: Р Р†Р ВµРЎР‚Р В±Р В°Р В»РЎРЉР Р…Р В°РЎРЏ Р С‘ Р Р…Р ВµР Р†Р ВµРЎР‚Р В±Р В°Р В»РЎРЉР Р…Р В°РЎРЏ Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”Р В°РЎвЂ Р С‘РЎРЏ",
                 "url": "https://4brain.ru/management/communication.php",
                 "type": "article",
                 "skill": "communication",
             },
             {
                 "id": "ru_4brain_comm_nonverbal",
-                "title": "Невербальная коммуникация",
+                "title": "Р СњР ВµР Р†Р ВµРЎР‚Р В±Р В°Р В»РЎРЉР Р…Р В°РЎРЏ Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”Р В°РЎвЂ Р С‘РЎРЏ",
                 "url": "https://4brain.ru/nonverbal/",
                 "type": "article",
                 "skill": "communication",
             },
             {
                 "id": "ru_4brain_comm_listening",
-                "title": "Техники активного (глубокого) слушания",
+                "title": "Р СћР ВµРЎвЂ¦Р Р…Р С‘Р С”Р С‘ Р В°Р С”РЎвЂљР С‘Р Р†Р Р…Р С•Р С–Р С• (Р С–Р В»РЎС“Р В±Р С•Р С”Р С•Р С–Р С•) РЎРѓР В»РЎС“РЎв‚¬Р В°Р Р…Р С‘РЎРЏ",
                 "url": "https://4brain.ru/blog/glubokoe-slushanie/",
                 "type": "article",
                 "skill": "communication",
             },
             {
                 "id": "ru_4brain_comm_negotiation",
-                "title": "Ведение переговоров: основы и структура",
+                "title": "Р вЂ™Р ВµР Т‘Р ВµР Р…Р С‘Р Вµ Р С—Р ВµРЎР‚Р ВµР С–Р С•Р Р†Р С•РЎР‚Р С•Р Р†: Р С•РЎРѓР Р…Р С•Р Р†РЎвЂ№ Р С‘ РЎРѓРЎвЂљРЎР‚РЎС“Р С”РЎвЂљРЎС“РЎР‚Р В°",
                 "url": "https://4brain.ru/peregovory/",
                 "type": "article",
                 "skill": "communication",
             },
             {
                 "id": "ru_4brain_comm_rhetoric",
-                "title": "Ораторское искусство: уроки риторики",
+                "title": "Р С›РЎР‚Р В°РЎвЂљР С•РЎР‚РЎРѓР С”Р С•Р Вµ Р С‘РЎРѓР С”РЎС“РЎРѓРЎРѓРЎвЂљР Р†Р С•: РЎС“РЎР‚Р С•Р С”Р С‘ РЎР‚Р С‘РЎвЂљР С•РЎР‚Р С‘Р С”Р С‘",
                 "url": "https://4brain.ru/oratorskoe-iskusstvo/",
                 "type": "article",
                 "skill": "communication",
             },
             {
                 "id": "ru_stepik_comm_effective",
-                "title": "Навыки эффективной коммуникации",
+                "title": "Р СњР В°Р Р†РЎвЂ№Р С”Р С‘ РЎРЊРЎвЂћРЎвЂћР ВµР С”РЎвЂљР С‘Р Р†Р Р…Р С•Р в„– Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”Р В°РЎвЂ Р С‘Р С‘",
                 "url": "https://stepik.org/course/205042/promo",
                 "type": "course",
                 "skill": "communication",
             },
             {
                 "id": "ru_stepik_comm_business",
-                "title": "Деловые коммуникации",
+                "title": "Р вЂќР ВµР В»Р С•Р Р†РЎвЂ№Р Вµ Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”Р В°РЎвЂ Р С‘Р С‘",
                 "url": "https://stepik.org/course/87737/promo",
                 "type": "course",
                 "skill": "communication",
             },
             {
                 "id": "ru_openedu_teamwork",
-                "title": "Командная работа",
+                "title": "Р С™Р С•Р СР В°Р Р…Р Т‘Р Р…Р В°РЎРЏ РЎР‚Р В°Р В±Р С•РЎвЂљР В°",
                 "url": "https://openedu.ru/course/ITMOUniversity/TEAMWORK/",
                 "type": "course",
                 "skill": "communication",
             },
             {
                 "id": "ru_4brain_ei_base",
-                "title": "Эмоциональный интеллект: основы и упражнения",
+                "title": "Р В­Р СР С•РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– Р С‘Р Р…РЎвЂљР ВµР В»Р В»Р ВµР С”РЎвЂљ: Р С•РЎРѓР Р…Р С•Р Р†РЎвЂ№ Р С‘ РЎС“Р С—РЎР‚Р В°Р В¶Р Р…Р ВµР Р…Р С‘РЎРЏ",
                 "url": "https://4brain.ru/emotion/",
                 "type": "article",
                 "skill": "emotional_intelligence",
             },
             {
                 "id": "ru_4brain_ei_article",
-                "title": "Как развить эмоциональный интеллект",
+                "title": "Р С™Р В°Р С” РЎР‚Р В°Р В·Р Р†Р С‘РЎвЂљРЎРЉ РЎРЊР СР С•РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– Р С‘Р Р…РЎвЂљР ВµР В»Р В»Р ВµР С”РЎвЂљ",
                 "url": "https://4brain.ru/blog/emotional-intellect/",
                 "type": "article",
                 "skill": "emotional_intelligence",
             },
             {
                 "id": "ru_stepik_ei",
-                "title": "Эмоциональный интеллект: ключ к успеху",
+                "title": "Р В­Р СР С•РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– Р С‘Р Р…РЎвЂљР ВµР В»Р В»Р ВµР С”РЎвЂљ: Р С”Р В»РЎР‹РЎвЂЎ Р С” РЎС“РЎРѓР С—Р ВµРЎвЂ¦РЎС“",
                 "url": "https://stepik.org/course/133690/promo",
                 "type": "course",
                 "skill": "emotional_intelligence",
             },
             {
                 "id": "ru_4brain_ct_base",
-                "title": "Критическое мышление: что это и как развивать",
+                "title": "Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С•Р Вµ Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…Р С‘Р Вµ: РЎвЂЎРЎвЂљР С• РЎРЊРЎвЂљР С• Р С‘ Р С”Р В°Р С” РЎР‚Р В°Р В·Р Р†Р С‘Р Р†Р В°РЎвЂљРЎРЉ",
                 "url": "https://4brain.ru/critical/",
                 "type": "article",
                 "skill": "critical_thinking",
             },
             {
                 "id": "ru_4brain_ct_skills",
-                "title": "Критическое мышление: навыки и свойства",
+                "title": "Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С•Р Вµ Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…Р С‘Р Вµ: Р Р…Р В°Р Р†РЎвЂ№Р С”Р С‘ Р С‘ РЎРѓР Р†Р С•Р в„–РЎРѓРЎвЂљР Р†Р В°",
                 "url": "https://4brain.ru/critical/navyk.php",
                 "type": "article",
                 "skill": "critical_thinking",
             },
             {
                 "id": "ru_stepik_ct",
-                "title": "Критическое мышление",
+                "title": "Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С•Р Вµ Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…Р С‘Р Вµ",
                 "url": "https://stepik.org/course/63700/promo",
                 "type": "course",
                 "skill": "critical_thinking",
             },
             {
                 "id": "ru_postnauka_ct_video",
-                "title": "Критическое мышление",
+                "title": "Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С•Р Вµ Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…Р С‘Р Вµ",
                 "url": "https://postnauka.ru/tv/155334",
                 "type": "video",
                 "skill": "critical_thinking",
             },
             {
                 "id": "ru_4brain_tm_base",
-                "title": "Тайм-менеджмент: управление временем",
+                "title": "Р СћР В°Р в„–Р С-Р СР ВµР Р…Р ВµР Т‘Р В¶Р СР ВµР Р…РЎвЂљ: РЎС“Р С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С‘Р Вµ Р Р†РЎР‚Р ВµР СР ВµР Р…Р ВµР С",
                 "url": "https://4brain.ru/time/",
                 "type": "article",
                 "skill": "time_management",
             },
             {
                 "id": "ru_4brain_tm_basics",
-                "title": "Тайм-менеджмент: основы",
+                "title": "Р СћР В°Р в„–Р С-Р СР ВµР Р…Р ВµР Т‘Р В¶Р СР ВµР Р…РЎвЂљ: Р С•РЎРѓР Р…Р С•Р Р†РЎвЂ№",
                 "url": "https://4brain.ru/time/osnovy.php",
                 "type": "article",
                 "skill": "time_management",
             },
             {
                 "id": "ru_4brain_tm_psy",
-                "title": "Психологические аспекты тайм-менеджмента",
+                "title": "Р СџРЎРѓР С‘РЎвЂ¦Р С•Р В»Р С•Р С–Р С‘РЎвЂЎР ВµРЎРѓР С”Р С‘Р Вµ Р В°РЎРѓР С—Р ВµР С”РЎвЂљРЎвЂ№ РЎвЂљР В°Р в„–Р С-Р СР ВµР Р…Р ВµР Т‘Р В¶Р СР ВµР Р…РЎвЂљР В°",
                 "url": "https://4brain.ru/blog/psihologiya-taym-menedzhmenta/",
                 "type": "article",
                 "skill": "time_management",
             },
             {
                 "id": "ru_openedu_tm_course",
-                "title": "Онлайн-курс: Тайм-менеджмент",
+                "title": "Р С›Р Р…Р В»Р В°Р в„–Р Р…-Р С”РЎС“РЎР‚РЎРѓ: Р СћР В°Р в„–Р С-Р СР ВµР Р…Р ВµР Т‘Р В¶Р СР ВµР Р…РЎвЂљ",
                 "url": "https://openedu.ru/course/misis/TMNG/",
                 "type": "course",
                 "skill": "time_management",
             },
             {
                 "id": "ru_stepik_tm",
-                "title": "Тайм-менеджмент",
+                "title": "Р СћР В°Р в„–Р С-Р СР ВµР Р…Р ВµР Т‘Р В¶Р СР ВµР Р…РЎвЂљ",
                 "url": "https://stepik.org/course/102186/promo",
                 "type": "course",
                 "skill": "time_management",
             },
             {
                 "id": "ru_4brain_lead_base",
-                "title": "Лидерство: базовые принципы и подходы",
+                "title": "Р вЂєР С‘Р Т‘Р ВµРЎР‚РЎРѓРЎвЂљР Р†Р С•: Р В±Р В°Р В·Р С•Р Р†РЎвЂ№Р Вµ Р С—РЎР‚Р С‘Р Р…РЎвЂ Р С‘Р С—РЎвЂ№ Р С‘ Р С—Р С•Р Т‘РЎвЂ¦Р С•Р Т‘РЎвЂ№",
                 "url": "https://4brain.ru/liderstvo/",
                 "type": "article",
                 "skill": "leadership",
             },
             {
                 "id": "ru_4brain_lead_course",
-                "title": "Лидерство и мотивация: основы",
+                "title": "Р вЂєР С‘Р Т‘Р ВµРЎР‚РЎРѓРЎвЂљР Р†Р С• Р С‘ Р СР С•РЎвЂљР С‘Р Р†Р В°РЎвЂ Р С‘РЎРЏ: Р С•РЎРѓР Р…Р С•Р Р†РЎвЂ№",
                 "url": "https://4brain.ru/management/leadership.php",
                 "type": "article",
                 "skill": "leadership",
             },
             {
                 "id": "ru_4brain_lead_practice",
-                "title": "Как быть лидером: практические советы",
+                "title": "Р С™Р В°Р С” Р В±РЎвЂ№РЎвЂљРЎРЉ Р В»Р С‘Р Т‘Р ВµРЎР‚Р С•Р С: Р С—РЎР‚Р В°Р С”РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С‘Р Вµ РЎРѓР С•Р Р†Р ВµРЎвЂљРЎвЂ№",
                 "url": "https://4brain.ru/blog/kak-byt-liderom/",
                 "type": "article",
                 "skill": "leadership",
             },
             {
                 "id": "ru_openedu_lead_course",
-                "title": "Лидерство и командообразование",
+                "title": "Р вЂєР С‘Р Т‘Р ВµРЎР‚РЎРѓРЎвЂљР Р†Р С• Р С‘ Р С”Р С•Р СР В°Р Р…Р Т‘Р С•Р С•Р В±РЎР‚Р В°Р В·Р С•Р Р†Р В°Р Р…Р С‘Р Вµ",
                 "url": "https://openedu.ru/course/mephi/mephi_lfkpt/",
                 "type": "course",
                 "skill": "leadership",
             },
             {
                 "id": "ru_stepik_lead_team",
-                "title": "Лидерство и командообразование",
+                "title": "Р вЂєР С‘Р Т‘Р ВµРЎР‚РЎРѓРЎвЂљР Р†Р С• Р С‘ Р С”Р С•Р СР В°Р Р…Р Т‘Р С•Р С•Р В±РЎР‚Р В°Р В·Р С•Р Р†Р В°Р Р…Р С‘Р Вµ",
                 "url": "https://stepik.org/course/83003/promo",
                 "type": "course",
                 "skill": "leadership",
@@ -986,15 +1228,15 @@ class PlanService:
 
     def _weakness_to_skill(self, weakness: str) -> Optional[str]:
         w = str(weakness or "").lower()
-        if "тайм" in w or "времен" in w:
+        if "РЎвЂљР В°Р в„–Р С" in w or "Р Р†РЎР‚Р ВµР СР ВµР Р…" in w:
             return "time_management"
-        if "крит" in w:
+        if "Р С”РЎР‚Р С‘РЎвЂљ" in w:
             return "critical_thinking"
-        if "коммуник" in w or "общен" in w:
+        if "Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”" in w or "Р С•Р В±РЎвЂ°Р ВµР Р…" in w:
             return "communication"
-        if "эмоцион" in w:
+        if "РЎРЊР СР С•РЎвЂ Р С‘Р С•Р Р…" in w:
             return "emotional_intelligence"
-        if "лидер" in w:
+        if "Р В»Р С‘Р Т‘Р ВµРЎР‚" in w:
             return "leadership"
         return None
 
@@ -1597,7 +1839,7 @@ class PlanService:
                 materials=[
                     MaterialItem(
                         id="mat_communication_basics",
-                        title="Основы коммуникации: активное слушание",
+                        title="Р С›РЎРѓР Р…Р С•Р Р†РЎвЂ№ Р С”Р С•Р СР СРЎС“Р Р…Р С‘Р С”Р В°РЎвЂ Р С‘Р С‘: Р В°Р С”РЎвЂљР С‘Р Р†Р Р…Р С•Р Вµ РЎРѓР В»РЎС“РЎв‚¬Р В°Р Р…Р С‘Р Вµ",
                         url="https://4brain.ru/blog/glubokoe-slushanie/",
                         type="article",
                         skill="communication",
@@ -1605,7 +1847,7 @@ class PlanService:
                     ),
                     MaterialItem(
                         id="mat_ei_basics",
-                        title="Эмоциональный интеллект: базовые принципы",
+                        title="Р В­Р СР С•РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– Р С‘Р Р…РЎвЂљР ВµР В»Р В»Р ВµР С”РЎвЂљ: Р В±Р В°Р В·Р С•Р Р†РЎвЂ№Р Вµ Р С—РЎР‚Р С‘Р Р…РЎвЂ Р С‘Р С—РЎвЂ№",
                         url="https://4brain.ru/emotion/",
                         type="article",
                         skill="emotional_intelligence",
@@ -1613,7 +1855,7 @@ class PlanService:
                     ),
                     MaterialItem(
                         id="mat_critical_thinking_basics",
-                        title="Критическое мышление: как задавать правильные вопросы",
+                        title="Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С•Р Вµ Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…Р С‘Р Вµ: Р С”Р В°Р С” Р В·Р В°Р Т‘Р В°Р Р†Р В°РЎвЂљРЎРЉ Р С—РЎР‚Р В°Р Р†Р С‘Р В»РЎРЉР Р…РЎвЂ№Р Вµ Р Р†Р С•Р С—РЎР‚Р С•РЎРѓРЎвЂ№",
                         url="https://4brain.ru/critical/",
                         type="article",
                         skill="critical_thinking",
@@ -1623,21 +1865,21 @@ class PlanService:
                 tasks=[
                     TaskItem(
                         id="task_reflect_1",
-                        description="После диалога запишите 3 пункта: что получилось, что можно улучшить, какой следующий шаг.",
+                        description="Р СџР С•РЎРѓР В»Р Вµ Р Т‘Р С‘Р В°Р В»Р С•Р С–Р В° Р В·Р В°Р С—Р С‘РЎв‚¬Р С‘РЎвЂљР Вµ 3 Р С—РЎС“Р Р…Р С”РЎвЂљР В°: РЎвЂЎРЎвЂљР С• Р С—Р С•Р В»РЎС“РЎвЂЎР С‘Р В»Р С•РЎРѓРЎРЉ, РЎвЂЎРЎвЂљР С• Р СР С•Р В¶Р Р…Р С• РЎС“Р В»РЎС“РЎвЂЎРЎв‚¬Р С‘РЎвЂљРЎРЉ, Р С”Р В°Р С”Р С•Р в„– РЎРѓР В»Р ВµР Т‘РЎС“РЎР‹РЎвЂ°Р С‘Р в„– РЎв‚¬Р В°Р С–.",
                         skill="communication",
                         status="pending",
                         completed_at=None,
                     ),
                     TaskItem(
                         id="task_ei_1",
-                        description="В следующей сложной ситуации попробуйте назвать эмоции собеседника и уточнить их вопросом.",
+                        description="Р вЂ™ РЎРѓР В»Р ВµР Т‘РЎС“РЎР‹РЎвЂ°Р ВµР в„– РЎРѓР В»Р С•Р В¶Р Р…Р С•Р в„– РЎРѓР С‘РЎвЂљРЎС“Р В°РЎвЂ Р С‘Р С‘ Р С—Р С•Р С—РЎР‚Р С•Р В±РЎС“Р в„–РЎвЂљР Вµ Р Р…Р В°Р В·Р Р†Р В°РЎвЂљРЎРЉ РЎРЊР СР С•РЎвЂ Р С‘Р С‘ РЎРѓР С•Р В±Р ВµРЎРѓР ВµР Т‘Р Р…Р С‘Р С”Р В° Р С‘ РЎС“РЎвЂљР С•РЎвЂЎР Р…Р С‘РЎвЂљРЎРЉ Р С‘РЎвЂ¦ Р Р†Р С•Р С—РЎР‚Р С•РЎРѓР С•Р С.",
                         skill="emotional_intelligence",
                         status="pending",
                         completed_at=None,
                     ),
                     TaskItem(
                         id="task_ct_1",
-                        description="Перед решением задачи сформулируйте 5 уточняющих вопросов (что неизвестно, какие ограничения).",
+                        description="Р СџР ВµРЎР‚Р ВµР Т‘ РЎР‚Р ВµРЎв‚¬Р ВµР Р…Р С‘Р ВµР С Р В·Р В°Р Т‘Р В°РЎвЂЎР С‘ РЎРѓРЎвЂћР С•РЎР‚Р СРЎС“Р В»Р С‘РЎР‚РЎС“Р в„–РЎвЂљР Вµ 5 РЎС“РЎвЂљР С•РЎвЂЎР Р…РЎРЏРЎР‹РЎвЂ°Р С‘РЎвЂ¦ Р Р†Р С•Р С—РЎР‚Р С•РЎРѓР С•Р Р† (РЎвЂЎРЎвЂљР С• Р Р…Р ВµР С‘Р В·Р Р†Р ВµРЎРѓРЎвЂљР Р…Р С•, Р С”Р В°Р С”Р С‘Р Вµ Р С•Р С–РЎР‚Р В°Р Р…Р С‘РЎвЂЎР ВµР Р…Р С‘РЎРЏ).",
                         skill="critical_thinking",
                         status="pending",
                         completed_at=None,
@@ -1646,8 +1888,8 @@ class PlanService:
                 recommended_tests=[
                     TestRecommendation(
                         test_id=0,
-                        title="Любой доступный тест",
-                        reason="Пока сервис генерации рекомендаций недоступен — пройдите тесты из раздела 'Тесты' для накопления данных.",
+                        title="Р вЂєРЎР‹Р В±Р С•Р в„– Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С—Р Р…РЎвЂ№Р в„– РЎвЂљР ВµРЎРѓРЎвЂљ",
+                        reason="Р СџР С•Р С”Р В° РЎРѓР ВµРЎР‚Р Р†Р С‘РЎРѓ Р С–Р ВµР Р…Р ВµРЎР‚Р В°РЎвЂ Р С‘Р С‘ РЎР‚Р ВµР С”Р С•Р СР ВµР Р…Р Т‘Р В°РЎвЂ Р С‘Р в„– Р Р…Р ВµР Т‘Р С•РЎРѓРЎвЂљРЎС“Р С—Р ВµР Р… РІР‚вЂќ Р С—РЎР‚Р С•Р в„–Р Т‘Р С‘РЎвЂљР Вµ РЎвЂљР ВµРЎРѓРЎвЂљРЎвЂ№ Р С‘Р В· РЎР‚Р В°Р В·Р Т‘Р ВµР В»Р В° 'Р СћР ВµРЎРѓРЎвЂљРЎвЂ№' Р Т‘Р В»РЎРЏ Р Р…Р В°Р С”Р С•Р С—Р В»Р ВµР Р…Р С‘РЎРЏ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦.",
                     )
                 ],
             )
@@ -1779,7 +2021,7 @@ class PlanService:
             if t not in picked:
                 picked.append(t)
 
-        reason = "Рекомендуем пройти тесты, чтобы собрать больше данных и улучшить слабые навыки." if weaknesses else "Рекомендуем пройти тесты для накопления данных." 
+        reason = "Р В Р ВµР С”Р С•Р СР ВµР Р…Р Т‘РЎС“Р ВµР С Р С—РЎР‚Р С•Р в„–РЎвЂљР С‘ РЎвЂљР ВµРЎРѓРЎвЂљРЎвЂ№, РЎвЂЎРЎвЂљР С•Р В±РЎвЂ№ РЎРѓР С•Р В±РЎР‚Р В°РЎвЂљРЎРЉ Р В±Р С•Р В»РЎРЉРЎв‚¬Р Вµ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦ Р С‘ РЎС“Р В»РЎС“РЎвЂЎРЎв‚¬Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р В°Р В±РЎвЂ№Р Вµ Р Р…Р В°Р Р†РЎвЂ№Р С”Р С‘." if weaknesses else "Р В Р ВµР С”Р С•Р СР ВµР Р…Р Т‘РЎС“Р ВµР С Р С—РЎР‚Р С•Р в„–РЎвЂљР С‘ РЎвЂљР ВµРЎРѓРЎвЂљРЎвЂ№ Р Т‘Р В»РЎРЏ Р Р…Р В°Р С”Р С•Р С—Р В»Р ВµР Р…Р С‘РЎРЏ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦." 
         return [
             TestRecommendation(test_id=int(t.id), title=t.title, reason=reason)
             for t in picked[:3]
@@ -1832,11 +2074,11 @@ class PlanService:
         Requirements: 2.5
         """
         skills = [
-            ("Тайм-менеджмент", profile.time_management_score),
-            ("Критическое мышление", profile.critical_thinking_score),
-            ("Коммуникация", profile.communication_score),
-            ("Эмоциональный интеллект", profile.emotional_intelligence_score),
-            ("Лидерство", profile.leadership_score)
+            ("Р СћР В°Р в„–Р С-Р СР ВµР Р…Р ВµР Т‘Р В¶Р СР ВµР Р…РЎвЂљ", profile.time_management_score),
+            ("Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С•Р Вµ Р СРЎвЂ№РЎв‚¬Р В»Р ВµР Р…Р С‘Р Вµ", profile.critical_thinking_score),
+            ("Р С™Р С•Р СР СРЎС“Р Р…Р С‘Р С”Р В°РЎвЂ Р С‘РЎРЏ", profile.communication_score),
+            ("Р В­Р СР С•РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– Р С‘Р Р…РЎвЂљР ВµР В»Р В»Р ВµР С”РЎвЂљ", profile.emotional_intelligence_score),
+            ("Р вЂєР С‘Р Т‘Р ВµРЎР‚РЎРѓРЎвЂљР Р†Р С•", profile.leadership_score)
         ]
         
         # Sort by score (ascending) to get weaknesses

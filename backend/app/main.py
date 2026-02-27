@@ -1,8 +1,9 @@
 import asyncio
+import json
 import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func, text
 from app.core.config import settings
@@ -20,6 +21,47 @@ log_level = os.getenv("LOG_LEVEL", "INFO")
 use_json_logging = os.getenv("USE_JSON_LOGGING", "true").lower() == "true"
 setup_logging(log_level=log_level, use_json=use_json_logging)
 logger = logging.getLogger(__name__)
+
+
+def _text_quality_score(value: str) -> int:
+    letters = sum(1 for ch in value if ch.isalpha())
+    cyrillic = sum(1 for ch in value if ("а" <= ch.lower() <= "я") or ch in {"ё", "Ё"})
+    digits = sum(1 for ch in value if ch.isdigit())
+    spaces = sum(1 for ch in value if ch.isspace())
+    punctuation = sum(1 for ch in value if ch in ".,!?;:()[]{}\"'/-_")
+    mojibake_markers = sum(1 for ch in value if ch in "\ufffdÐÑÃÂ")
+    control = sum(1 for ch in value if ord(ch) < 32 and ch not in "\r\n\t")
+    return letters + (cyrillic * 2) + digits + spaces + punctuation - (mojibake_markers * 6) - (control * 6)
+
+
+def _repair_text_encoding(value: object) -> str:
+    current = str(value or "")
+    for _ in range(2):
+        improved = None
+        for source_encoding in ("cp1251", "latin1"):
+            try:
+                candidate = current.encode(source_encoding).decode("utf-8")
+            except UnicodeError:
+                continue
+            if candidate == current:
+                continue
+            if _text_quality_score(candidate) > _text_quality_score(current) + 3:
+                improved = candidate
+                break
+        if improved is None:
+            break
+        current = improved
+    return current
+
+
+def _repair_payload_encoding(value: object) -> object:
+    if isinstance(value, str):
+        return _repair_text_encoding(value)
+    if isinstance(value, list):
+        return [_repair_payload_encoding(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _repair_payload_encoding(item) for key, item in value.items()}
+    return value
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -59,6 +101,50 @@ else:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+
+
+@app.middleware("http")
+async def repair_json_encoding_middleware(request: Request, call_next):
+    response = await call_next(request)
+    content_type = str(response.headers.get("content-type") or "").lower()
+    if "application/json" not in content_type:
+        return response
+
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk
+
+    if not body:
+        return response
+
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except Exception:
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=headers,
+            media_type=response.media_type,
+            background=response.background,
+        )
+
+    repaired_payload = _repair_payload_encoding(payload)
+    if repaired_payload == payload:
+        repaired_body = body
+    else:
+        repaired_body = json.dumps(repaired_payload, ensure_ascii=False).encode("utf-8")
+
+    headers = dict(response.headers)
+    headers.pop("content-length", None)
+    return Response(
+        content=repaired_body,
+        status_code=response.status_code,
+        headers=headers,
+        media_type="application/json",
+        background=response.background,
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
